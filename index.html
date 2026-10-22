@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>E.D.D.I.E</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='none' stroke='%234fd8ff' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%234fd8ff'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23c084fc' opacity='.18'/%3E%3Cg fill='%23f0abfc'%3E%3Ccircle cx='32' cy='32' r='5'/%3E%3Ccircle cx='18' cy='24' r='2.5'/%3E%3Ccircle cx='44' cy='20' r='2.5'/%3E%3Ccircle cx='46' cy='40' r='2.5'/%3E%3Ccircle cx='22' cy='44' r='2.5'/%3E%3Ccircle cx='32' cy='12' r='2'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!--
   Eddies grensesnitt. Åpnes direkte i nettleseren (file://) eller fra GitHub Pages.
 
@@ -21,13 +21,17 @@
     {"type": "status",  "key": "brain", "value": "...", "ok": true}
     {"type": "latency", "seconds": 1.9, "stt": 0.4, "brain": 1.2}
     {"type": "conversation", "active": true}               en samtale pågår (Eddie lytter av seg selv)
+    {"type": "graph",   "nodes": [{id, label, type, info, uses}], "edges": [[fra, til]]}
+                                                             hele kunnskapsgrafen (knowledge_graph.py); slås sammen
+    {"type": "activity", "path": ["eddie", "connector:ssb", …], "tool": "mcp__ssb__boligpriser"}
+                                                             hvor i hjernen Eddie leter akkurat nå
   Kommandoer til Eddie (bare disse to):
     {"type": "command", "action": "talk" | "stop"}
 -->
 <style>
   :root {
-    --bg: #02060c;
-    --bg-2: #051220;
+    --bg: #05030a;
+    --bg-2: #0e0716;
     --cyan: #4fd8ff;
     --cyan-bright: #b4f2ff;
     --cyan-dim: rgba(79, 216, 255, 0.28);
@@ -35,32 +39,28 @@
     --amber: #ffb547;
     --red: #ff4d5e;
     --green: #57ffb0;
-    --text: #cfeeff;
-    --text-dim: #6f97ad;
-    --panel: rgba(6, 22, 38, 0.55);
+    --text: #e4dcf0;
+    --text-dim: #8a7fa3;
+    --panel: rgba(16, 10, 26, 0.6);
+    --line: rgba(220, 160, 255, 0.16);
     --head: "Orbitron", "Segoe UI", system-ui, sans-serif;
     --body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", Consolas, monospace;
+    --big: "Bebas Neue", "Orbitron", sans-serif;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
-    background:
-      radial-gradient(ellipse at 50% 45%, #07233a 0%, var(--bg-2) 35%, var(--bg) 75%),
-      var(--bg);
+    background: radial-gradient(ellipse at 50% 42%, #1a0d26 0%, var(--bg-2) 40%, var(--bg) 80%), var(--bg);
     color: var(--text);
     font-family: var(--body);
     font-size: 16px;
     overflow: hidden;
   }
-  /* Svakt sekskantmønster og skannelinjer, som en projisert HUD. */
-  body::before {
-    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .5;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'%3E%3Cpath d='M28 0 56 16v32L28 64 0 48V16zM28 64v33' fill='none' stroke='%234fd8ff' stroke-opacity='.06'/%3E%3C/svg%3E");
-  }
   body::after {
     content: ""; position: fixed; inset: 0; pointer-events: none;
-    background: repeating-linear-gradient(to bottom, rgba(255,255,255,.018) 0 1px, transparent 1px 3px),
-                radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.65) 100%);
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,.012) 0 1px, transparent 1px 3px),
+                radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.7) 100%);
   }
 
   .app {
@@ -74,39 +74,39 @@
   /* Toppstripe */
   header {
     grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid var(--cyan-dim); padding-bottom: 10px; position: relative;
+    border-bottom: 1px solid var(--line); padding-bottom: 10px; position: relative;
   }
   header::after {
     content: ""; position: absolute; left: 0; bottom: -1px; width: 180px; height: 2px;
-    background: var(--cyan); box-shadow: 0 0 12px var(--cyan);
+    background: var(--state, var(--cyan)); box-shadow: 0 0 12px var(--state, var(--cyan)); transition: background .6s;
   }
   .brand { display: flex; align-items: baseline; gap: 14px; }
   .brand h1 {
     margin: 0; font-family: var(--head); font-weight: 700; font-size: 26px; letter-spacing: .32em;
-    color: var(--cyan-bright); text-shadow: 0 0 14px rgba(79,216,255,.7);
+    color: #f3e8ff; text-shadow: 0 0 14px var(--state, var(--cyan));
   }
   .brand span { color: var(--text-dim); letter-spacing: .2em; font-size: 13px; text-transform: uppercase; }
   .clock { text-align: right; font-family: var(--head); }
-  .clock .time { font-size: 22px; letter-spacing: .12em; color: var(--cyan-bright); }
+  .clock .time { font-size: 22px; letter-spacing: .12em; color: #f3e8ff; }
   .clock .date { font-family: var(--body); font-size: 13px; letter-spacing: .18em; color: var(--text-dim); text-transform: uppercase; }
 
-  /* HUD-paneler med hjørnemarkeringer */
+  /* Paneler */
   .panel {
-    position: relative; background: var(--panel); border: 1px solid var(--cyan-faint);
+    position: relative; background: var(--panel); border: 1px solid var(--line);
     padding: 16px 18px; backdrop-filter: blur(3px); min-height: 0;
     display: flex; flex-direction: column;
   }
   .panel::before, .panel::after {
-    content: ""; position: absolute; width: 16px; height: 16px; border: 2px solid var(--cyan);
-    filter: drop-shadow(0 0 4px var(--cyan));
+    content: ""; position: absolute; width: 14px; height: 14px; border: 2px solid var(--state, var(--cyan));
+    filter: drop-shadow(0 0 4px var(--state, var(--cyan))); transition: border-color .6s;
   }
   .panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
   .panel::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
   .panel h2 {
-    margin: 0 0 12px; font-family: var(--head); font-size: 12px; font-weight: 500; letter-spacing: .3em;
-    color: var(--cyan); display: flex; justify-content: space-between; align-items: center;
+    margin: 0 0 12px; font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: .3em;
+    color: var(--state, var(--cyan)); display: flex; justify-content: space-between; align-items: center;
   }
-  .panel h2 small { font-family: var(--body); letter-spacing: .12em; color: var(--text-dim); font-size: 12px; }
+  .panel h2 small { letter-spacing: .12em; color: var(--text-dim); font-size: 11px; }
 
   /* Systempanel */
   .status { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
@@ -115,51 +115,74 @@
   .dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); }
   .dot.warn { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
   .dot.err { background: var(--red); box-shadow: 0 0 8px var(--red); }
-  .status .k { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
+  .status .k { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
   .status .v { font-size: 16px; font-weight: 500; color: var(--text); }
 
-  .metric { margin-top: 18px; border-top: 1px solid var(--cyan-faint); padding-top: 14px; }
+  .metric { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
   .metric .row { display: flex; justify-content: space-between; align-items: baseline; }
-  .metric .big { font-family: var(--head); font-size: 30px; color: var(--cyan-bright); text-shadow: 0 0 10px rgba(79,216,255,.5); }
-  .metric .big.slow { color: var(--amber); text-shadow: 0 0 10px rgba(255,181,71,.5); }
-  .metric .lbl { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
+  .metric .big { font-family: var(--big); font-size: 38px; letter-spacing: .04em; color: #f3e8ff; }
+  .metric .big.slow { color: var(--amber); }
+  .metric .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
   .metric .split { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
   #spark { width: 100%; height: 54px; margin-top: 8px; display: block; }
 
-  /* Midten: reaktoren */
-  .core {
-    position: relative; display: grid; place-items: center; min-height: 0; min-width: 0;
+  /* Midten: hjernen */
+  .core { position: relative; min-height: 0; min-width: 0; }
+  #hud { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  #hud.dragging { cursor: grabbing; }
+  #hud.over-core { cursor: pointer; }
+  .strip {
+    position: absolute; left: 50%; top: 2px; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .22em; color: var(--text-dim); text-transform: uppercase;
+    display: flex; gap: 26px;
   }
-  #hud { width: 100%; height: 100%; display: block; }
-  .core.clickable #hud { cursor: pointer; }
+  .strip b { font-weight: 500; color: var(--state, var(--cyan)); transition: color .6s; }
+  .strip .live::before { content: "● "; color: var(--state, var(--cyan)); }
+  .card {
+    position: absolute; min-width: 190px; max-width: 250px; padding: 8px 12px 8px 14px; pointer-events: none;
+    background: rgba(14, 8, 22, .82); border: 1px solid var(--line); border-left: 2px solid var(--state, var(--cyan));
+    font-family: var(--mono); opacity: 0; transform: translateY(4px); transition: opacity .4s, transform .4s, border-color .6s;
+  }
+  .card.show { opacity: 1; transform: none; }
+  .card.dim { opacity: .55; }
+  .card .t { font-size: 10.5px; letter-spacing: .24em; color: #f3e8ff; text-transform: uppercase; }
+  .card .t::before { content: "◇ "; color: var(--state, var(--cyan)); }
+  .card .s { margin-top: 3px; font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #card-search { left: 3%; top: 9%; }
+  #card-learned { right: 3%; top: 9%; }
+  #card-source { right: 3%; bottom: 30%; }
+  .readout { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); text-align: center; pointer-events: none; width: 92%; }
+  .readout .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .3em; color: var(--state, var(--cyan)); text-transform: uppercase; transition: color .6s; }
+  .readout .num { font-family: var(--big); font-size: clamp(48px, 7vw, 86px); line-height: .95; color: #f3e8ff; letter-spacing: .02em; text-shadow: 0 0 24px rgba(240, 171, 252, .25); }
+  .readout .num small { font-family: var(--mono); font-size: 12px; letter-spacing: .3em; color: var(--text-dim); margin-left: 10px; }
+  .readout .bar { width: 260px; max-width: 70%; height: 2px; margin: 6px auto 8px; background: var(--line); position: relative; overflow: hidden; }
+  .readout .bar i { position: absolute; inset: 0; width: var(--fill, 30%); background: var(--state, var(--cyan)); box-shadow: 0 0 8px var(--state, var(--cyan)); transition: width .8s, background .6s; }
+  .readout .sub { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; color: var(--text-dim); text-transform: uppercase; }
+  .tooltip {
+    position: absolute; pointer-events: none; max-width: 260px; padding: 8px 10px; z-index: 3;
+    background: rgba(14, 8, 22, .94); border: 1px solid var(--line);
+    font-size: 14px; line-height: 1.3; color: var(--text); opacity: 0; transition: opacity .12s;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip b { display: block; font-weight: 600; color: #fff; }
+  .tooltip small { display: block; margin-top: 3px; font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); letter-spacing: .08em; }
   .talk {
-    position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%);
-    font-size: 13px; letter-spacing: .4em; padding: 12px 28px 12px calc(28px + .4em);
-    border-color: var(--cyan); color: var(--cyan-bright); background: rgba(79,216,255,.08);
-    box-shadow: 0 0 18px rgba(79,216,255,.25), inset 0 0 12px rgba(79,216,255,.15);
+    position: absolute; right: 3%; bottom: 4%;
+    font-size: 12px; letter-spacing: .35em; padding: 10px 20px 10px calc(20px + .35em);
+    border-color: var(--state, var(--cyan)); color: #f3e8ff; background: rgba(240, 171, 252, .06);
   }
-  .talk.active { border-color: var(--amber); color: var(--amber); background: rgba(255,181,71,.08);
-    box-shadow: 0 0 18px rgba(255,181,71,.3), inset 0 0 12px rgba(255,181,71,.15); }
+  .talk.active { border-color: var(--amber); color: var(--amber); background: rgba(255,181,71,.08); }
   .talk.active:hover { background: rgba(255,181,71,.18); color: #ffd79a; }
-  .core-label {
-    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    text-align: center; pointer-events: none;
-  }
-  .core-label .name { font-family: var(--head); font-size: 15px; letter-spacing: .5em; color: var(--cyan-bright); padding-left: .5em; }
-  .core-label .state {
-    margin-top: 6px; font-family: var(--head); font-size: 11px; letter-spacing: .4em; padding-left: .4em;
-    color: var(--state-color, var(--cyan)); text-shadow: 0 0 10px var(--state-color, var(--cyan));
-  }
 
   /* Samtalepanel */
-  .log { overflow-y: auto; flex: 1; min-height: 0; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--cyan-dim) transparent; }
+  .log { overflow-y: auto; flex: 1; min-height: 0; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .msg { margin: 0 0 14px; animation: fadein .35s ease-out; }
-  .msg .who { font-family: var(--head); font-size: 10px; letter-spacing: .3em; color: var(--text-dim); display: flex; gap: 10px; }
-  .msg.eddie .who { color: var(--cyan); }
+  .msg .who { font-family: var(--mono); font-size: 10px; letter-spacing: .3em; color: var(--text-dim); display: flex; gap: 10px; }
+  .msg.eddie .who { color: var(--state, var(--cyan)); }
   .msg .txt { font-size: 17px; line-height: 1.35; margin-top: 3px; }
-  .msg.user .txt { color: #e6f6ff; }
-  .msg.eddie .txt { color: var(--cyan-bright); }
-  .msg.eddie.live .txt::after { content: "▍"; color: var(--cyan); animation: blink 1s steps(2) infinite; }
+  .msg.user .txt { color: #f1ebf8; }
+  .msg.eddie .txt { color: #e9d5ff; }
+  .msg.eddie.live .txt::after { content: "▍"; color: var(--state, var(--cyan)); animation: blink 1s steps(2) infinite; }
   .empty { color: var(--text-dim); font-size: 15px; letter-spacing: .05em; }
   @keyframes fadein { from { opacity: 0; transform: translateY(4px); } }
   @keyframes blink { 50% { opacity: 0; } }
@@ -167,33 +190,36 @@
   /* Bunnstripe: undertekst og demo */
   footer {
     grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 16px;
-    border-top: 1px solid var(--cyan-faint); padding-top: 12px;
+    border-top: 1px solid var(--line); padding-top: 12px;
   }
   .subtitle { min-height: 52px; }
-  .subtitle .line { font-size: 22px; font-weight: 500; color: var(--cyan-bright); text-shadow: 0 0 12px rgba(79,216,255,.35); line-height: 1.25; }
-  .subtitle .hint { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
+  .subtitle .line { font-size: 22px; font-weight: 500; color: #f3e8ff; line-height: 1.25; }
+  .subtitle .hint { font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-top: 6px; }
   .controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
-  .controls .conn { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-right: 8px; display: flex; align-items: center; gap: 8px; }
+  .controls .conn { font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-right: 8px; display: flex; align-items: center; gap: 8px; }
   button {
-    font-family: var(--head); font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
-    color: var(--cyan); background: rgba(79,216,255,.05); border: 1px solid var(--cyan-dim);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase;
+    color: #e9d5ff; background: rgba(240,171,252,.04); border: 1px solid var(--line);
     padding: 8px 10px; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
   }
-  button:hover { background: rgba(79,216,255,.15); color: var(--cyan-bright); box-shadow: 0 0 10px rgba(79,216,255,.35); }
-  button.primary { border-color: var(--cyan); color: var(--cyan-bright); }
-  button:focus-visible { outline: 2px solid var(--cyan-bright); outline-offset: 2px; }
+  button:hover { background: rgba(240,171,252,.12); color: #fff; box-shadow: 0 0 10px rgba(240,171,252,.25); }
+  button.primary { border-color: var(--state, var(--cyan)); }
+  button:focus-visible { outline: 2px solid #f0abfc; outline-offset: 2px; }
   .controls.hidden button { display: none; }
 
-  /* Smal skjerm: reaktoren øverst, panelene under. */
+  /* Smal skjerm: hjernen øverst, panelene under. */
   @media (max-width: 1100px) {
     body { overflow: auto; }
     .app { height: auto; min-height: 100%; grid-template-columns: 1fr; padding: 14px 16px; }
-    .core { height: min(78vw, 460px); order: -1; grid-row: 2; }
+    .core { height: min(115vw, 620px); order: -1; grid-row: 2; }
     .panel.system { grid-row: 3; }
     .panel.convo { grid-row: 4; max-height: 60vh; }
     footer { grid-row: 5; grid-template-columns: 1fr; }
     .controls { justify-content: flex-start; }
-    .brand span { display: none; }
+    .brand span, .strip span:nth-child(n+3), #card-source { display: none; }
+    .card { min-width: 0; max-width: 46%; }
+    .talk { right: 50%; transform: translateX(50%); bottom: 1%; }
+    .readout { bottom: 9%; }
   }
   @media (prefers-reduced-motion: reduce) {
     .msg { animation: none; }
@@ -221,25 +247,40 @@
     </div>
   </section>
 
-  <section class="core" aria-label="Eddie">
+  <section class="core" aria-label="Eddies hjerne: det han er koblet til og vet om">
     <canvas id="hud" aria-hidden="true"></canvas>
-    <div class="core-label"><div class="name">EDDIE</div><div class="state" id="state-label" role="status">STANDBY</div></div>
+    <div class="strip" aria-hidden="true">
+      <span class="live">Hjerne · <b id="strip-state">standby</b></span>
+      <span>Link · <b id="strip-link">demo</b></span>
+      <span>Connectors · <b id="strip-conn">0</b></span>
+      <span>Partikler · <b id="strip-particles">0</b></span>
+    </div>
+    <div class="card" id="card-search"><div class="t">Leter i</div><div class="s"></div></div>
+    <div class="card" id="card-learned"><div class="t">Sist lært</div><div class="s"></div></div>
+    <div class="card" id="card-source"><div class="t">Kilde</div><div class="s"></div></div>
+    <div class="readout">
+      <div class="lbl" id="state-label" role="status">Standby</div>
+      <div class="num"><span id="brain-count">0</span><small>noder</small></div>
+      <div class="bar"><i id="brain-bar"></i></div>
+      <div class="sub" id="brain-sub"></div>
+    </div>
+    <div class="tooltip" id="tooltip" role="tooltip"></div>
     <button class="talk" id="talk" hidden>Snakk</button>
   </section>
 
   <section class="panel convo" aria-label="Samtale">
     <h2>SAMTALE <small id="count">0</small></h2>
-    <div class="log" id="log"><p class="empty" id="empty">Ingen samtale ennå. Hold høyre Ctrl og snakk, eller trykk «Kjør demo».</p></div>
+    <div class="log" id="log"><p class="empty" id="empty">Ingen samtale ennå. Trykk kort på høyre Ctrl og snakk, eller trykk «Kjør demo».</p></div>
   </section>
 
   <footer>
-    <div class="subtitle"><div class="line" id="subtitle"></div><div class="hint" id="hint">Hold høyre Ctrl for å snakke</div></div>
+    <div class="subtitle"><div class="line" id="subtitle"></div><div class="hint" id="hint">Trykk kort på høyre Ctrl for å snakke</div></div>
     <div class="controls" id="controls">
       <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-text">Kobler til …</span></span>
       <button data-state="idle" title="1">Standby</button>
       <button data-state="listening" title="2">Lytter</button>
       <button data-state="thinking" title="3">Tenker</button>
-      <button data-state="searching" title="4">Søker</button>
+      <button data-state="searching" title="4">Leter</button>
       <button data-state="speaking" title="5">Snakker</button>
       <button class="primary" id="demo" title="D">Kjør demo</button>
     </div>
@@ -249,19 +290,32 @@
 <script>
 "use strict";
 
-/* ---------- Tilstander ---------- */
+/* ---------- Tilstander: fargen hele hjernen tones mot ---------- */
 const STATES = {
-  idle:      { label: "STANDBY", color: [79, 216, 255], speed: 0.35, glow: 0.35, hint: "Hold høyre Ctrl for å snakke" },
-  listening: { label: "LYTTER",  color: [120, 230, 255], speed: 0.8,  glow: 0.8,  hint: "Snakk – Eddie lytter" },
-  thinking:  { label: "TENKER",  color: [255, 181, 71],  speed: 2.2,  glow: 0.7,  hint: "Eddie tenker …" },
-  searching: { label: "SØKER",   color: [255, 181, 71],  speed: 1.4,  glow: 0.7,  hint: "Eddie slår opp på nettet …" },
-  speaking:  { label: "SNAKKER", color: [180, 242, 255], speed: 1.0,  glow: 1.0,  hint: "Snakk for å avbryte" },
-  error:     { label: "FEIL",    color: [255, 77, 94],   speed: 0.5,  glow: 0.8,  hint: "Noe gikk galt – se loggen" },
+  idle:      { label: "Standby", color: [196, 140, 255], glow: 0.45, spin: 0.10, hint: "Trykk kort på høyre Ctrl for å snakke" },
+  listening: { label: "Lytter",  color: [79, 216, 255],  glow: 0.9,  spin: 0.14, hint: "Snakk – Eddie lytter" },
+  thinking:  { label: "Tenker",  color: [255, 181, 71],  glow: 0.85, spin: 0.42, hint: "Eddie tenker …" },
+  searching: { label: "Leter",   color: [255, 150, 60],  glow: 0.95, spin: 0.26, hint: "Eddie leter i hjernen …" },
+  speaking:  { label: "Snakker", color: [236, 112, 255], glow: 1.0,  spin: 0.18, hint: "Snakk for å avbryte" },
+  error:     { label: "Feil",    color: [255, 77, 94],   glow: 0.8,  spin: 0.05, hint: "Noe gikk galt – se loggen" },
+};
+
+/* Nodetyper fra knowledge_graph.py: farge, størrelse, avstand fra kjernen, navn */
+const TYPES = {
+  core:      { color: [255, 245, 255], r: 7,   name: "Eddie",     one: "",          plural: "" },
+  connector: { color: [216, 180, 254], r: 5,   name: "Connector", one: "connector", plural: "connectorer" },
+  hub:       { color: [196, 181, 253], r: 4.2, name: "Samling",   one: "samling",   plural: "samlinger" },
+  tool:      { color: [125, 211, 252], r: 3.2, name: "Verktøy",   one: "verktøy",   plural: "verktøy" },
+  knowledge: { color: [134, 239, 172], r: 2.8, name: "Kunnskap",  one: "kunnskap",  plural: "kunnskap" },
+  memory:    { color: [249, 168, 212], r: 3.2, name: "Minne",     one: "minne",     plural: "minner" },
+  content:   { color: [253, 224, 71],  r: 3.4, name: "Innhold",   one: "innhold",   plural: "innhold" },
 };
 
 const ui = {
   hud: document.getElementById("hud"),
+  core: document.querySelector(".core"),
   stateLabel: document.getElementById("state-label"),
+  tooltip: document.getElementById("tooltip"),
   subtitle: document.getElementById("subtitle"),
   hint: document.getElementById("hint"),
   log: document.getElementById("log"),
@@ -273,12 +327,20 @@ const ui = {
   spark: document.getElementById("spark"),
   connDot: document.getElementById("conn-dot"),
   connText: document.getElementById("conn-text"),
+  stripState: document.getElementById("strip-state"),
+  stripLink: document.getElementById("strip-link"),
+  stripConn: document.getElementById("strip-conn"),
+  stripParticles: document.getElementById("strip-particles"),
+  brainCount: document.getElementById("brain-count"),
+  brainBar: document.getElementById("brain-bar"),
+  brainSub: document.getElementById("brain-sub"),
 };
 
 const S = {
-  state: "idle", level: 0, levelTarget: 0, t: 0, speed: 0.35, glow: 0.35,
-  color: [...STATES.idle.color], rot: [0, 0, 0, 0], latencies: [], messages: 0,
-  live: null, // Eddie-melding som skrives nå
+  state: "idle", level: 0, levelTarget: 0, t: 0, glow: 0.45, spin: 0.1,
+  color: [...STATES.idle.color], latencies: [], messages: 0,
+  live: null,       // Eddie-melding som skrives nå
+  activity: null,   // {path, t0, fadeAt} – hvor Eddie leter
 };
 
 /* ---------- Offentlig API (brukes av WebSocket og demo) ---------- */
@@ -288,9 +350,11 @@ const Eddie = {
     S.state = name;
     const st = STATES[name];
     ui.stateLabel.textContent = st.label;
-    ui.stateLabel.style.setProperty("--state-color", `rgb(${st.color.join(",")})`);
+    ui.stripState.textContent = st.label;
+    document.documentElement.style.setProperty("--state", `rgb(${st.color.join(",")})`);
     ui.hint.textContent = st.hint;
     if (name !== "speaking" && name !== "listening") S.levelTarget = 0;
+    if (S.activity && name !== "thinking" && name !== "searching" && !S.activity.fadeAt) S.activity.fadeAt = S.t + 2.5;
   },
   setLevel(v) { S.levelTarget = Math.max(0, Math.min(1, v)); },
   userSaid(text) {
@@ -332,6 +396,16 @@ const Eddie = {
     ui.latencySplit.textContent = parts.join(" · ").replace(/\./g, ",") || "fra du sluttet å snakke";
     drawSpark();
   },
+  graph(snapshot, replace = false) { mergeGraph(snapshot, replace); },
+  activity(path) {
+    const known = path.filter(id => G.nodes.has(id));
+    if (!known.length) return;
+    S.activity = { path: known, t0: S.t, fadeAt: null };
+    const labels = known.filter(id => id !== "eddie").map(id => G.nodes.get(id).label);
+    showCard("search", labels.slice(-3).join(" › "), known[known.length - 1]);  // slutten (det han fant) er viktigst
+    const connector = known.find(id => G.nodes.get(id).type === "connector" || G.nodes.get(id).type === "hub");
+    if (connector) showCard("source", labels.slice(0, 2).join(" · "), connector);
+  },
 };
 window.Eddie = Eddie;
 
@@ -371,10 +445,138 @@ function tickClock() {
 }
 setInterval(tickClock, 1000); tickClock();
 
-/* ---------- Reaktoren (canvas) ---------- */
+/* ---------- Kunnskapsgrafen (data) ---------- */
+const G = { nodes: new Map(), edges: [], parent: new Map() };
+
+function hash(str, seed = 0) {
+  let h = 2166136261 ^ seed;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 100000) / 100000;
+}
+
+function mergeGraph(snap, replace) {
+  if (replace) { G.nodes.clear(); G.edges = []; G.parent.clear(); S.activity = null; }
+  const parentOf = new Map(snap.edges.map(([a, b]) => [b, a]));
+  const learned = [];
+  for (const n of snap.nodes) {
+    const old = G.nodes.get(n.id);
+    if (old) { Object.assign(old, { label: n.label, type: n.type, info: n.info, uses: n.uses }); continue; }
+    G.nodes.set(n.id, { ...n, born: S.t, fresh: !replace && G.nodes.size > 0 });
+    if (!replace && n.type === "content") learned.push(n.id);
+  }
+  const have = new Set(G.edges.map(e => e.join(">")));
+  for (const [a, b] of snap.edges) {
+    if (G.nodes.has(a) && G.nodes.has(b) && !have.has(a + ">" + b)) { G.edges.push([a, b]); have.add(a + ">" + b); }
+  }
+  for (const [b, a] of parentOf) if (G.nodes.has(a) && G.nodes.has(b)) G.parent.set(b, a);
+  layoutBrain();
+  if (learned.length) {
+    const n = G.nodes.get(learned[learned.length - 1]);
+    showCard("learned", `${n.label} · ${TYPES[n.type]?.name || n.type}`, n.id, true);
+  }
+  updateReadout();
+}
+
+function updateReadout() {
+  const counts = {};
+  for (const n of G.nodes.values()) counts[n.type] = (counts[n.type] || 0) + 1;
+  ui.brainCount.textContent = G.nodes.size;
+  ui.brainSub.textContent = ["connector", "tool", "knowledge", "memory", "content"]
+    .filter(t => counts[t]).map(t => `${counts[t]} ${counts[t] === 1 ? TYPES[t].one : TYPES[t].plural}`).join(" · ");
+  ui.stripConn.textContent = counts.connector || 0;
+  // Baren fyller seg mot 100 noder: en grov følelse av hvor «stor» hjernen er blitt.
+  ui.brainBar.style.setProperty("--fill", Math.min(100, G.nodes.size) + "%");
+}
+
+/* ---------- Hjernen i 3D ---------- */
+const B = { R: 1, filler: [], links: [], rotY: 0.6, rotX: -0.32, drag: null, userSpin: 0 };
+
+/* Hver gren (connector/samling under Eddie) får sitt område av kula; jo dypere i grenen, jo lenger ut. */
+function layoutBrain() {
+  const roots = [...G.nodes.values()].filter(n => G.parent.get(n.id) === "eddie").map(n => n.id).sort();
+  const dirs = new Map();
+  const count = Math.max(roots.length, 5);
+  roots.forEach((id, i) => {
+    const y = 1 - (i + 0.5) / count * 2, r = Math.sqrt(1 - y * y), phi = i * 2.399963 + 0.7;
+    dirs.set(id, [Math.cos(phi) * r, y * 0.8, Math.sin(phi) * r]);
+  });
+  for (const n of G.nodes.values()) {
+    if (n.id === "eddie") { n.p = [0, 0, 0]; n.q = n.q || [0, 0, 0]; continue; }
+    let root = n.id, depth = 1;
+    while (G.parent.get(root) && G.parent.get(root) !== "eddie") { root = G.parent.get(root); depth++; }
+    const base = dirs.get(root) || [hash(n.id, 1) - 0.5, hash(n.id, 2) - 0.5, hash(n.id, 3) - 0.5];
+    const spread = depth === 1 ? 0 : 0.28 + 0.22 * depth;
+    const d = norm([
+      base[0] + (hash(n.id, 4) - 0.5) * spread * 2,
+      base[1] + (hash(n.id, 5) - 0.5) * spread * 2,
+      base[2] + (hash(n.id, 6) - 0.5) * spread * 2,
+    ]);
+    const rad = Math.min(0.95, 0.3 + 0.22 * depth + hash(n.id, 7) * 0.08);
+    n.p = [d[0] * rad, d[1] * rad, d[2] * rad];
+    if (!n.q) {
+      const from = G.nodes.get(G.parent.get(n.id))?.q || [0, 0, 0];
+      n.q = n.fresh ? [...from] : [...n.p];
+    }
+  }
+  growFiller();
+}
+const norm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+
+/* Fyllpartiklene er vev rundt de ekte nodene: pynt, men antallet følger hvor mye Eddie vet. */
+function growFiller() {
+  const target = Math.max(380, Math.min(1500, 260 + 34 * G.nodes.size));
+  const real = [...G.nodes.values()].filter(n => n.id !== "eddie");
+  while (B.filler.length < target) {
+    // Litt tettere rundt de ekte nodene, ellers jevnt i kula.
+    let p;
+    if (real.length && Math.random() < 0.35) {
+      const n = real[Math.floor(Math.random() * real.length)], s = 0.16;
+      p = [n.p[0] + (Math.random() - 0.5) * s, n.p[1] + (Math.random() - 0.5) * s, n.p[2] + (Math.random() - 0.5) * s];
+    } else {
+      const d = norm([Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1]);
+      const r = Math.pow(Math.random(), 0.55);
+      p = [d[0] * r, d[1] * r * 0.96, d[2] * r];
+    }
+    const i = B.filler.length;
+    B.filler.push({ p, phase: Math.random() * 6.28, size: 0.6 + Math.random() * 1.1, born: S.t, flash: 0 });
+    // Kobl til de nærmeste blant et utvalg, så det blir et nett av tråder.
+    let best = [], tries = Math.min(i, 70);
+    for (let k = 0; k < tries; k++) {
+      const j = Math.floor(Math.random() * i), q = B.filler[j].p;
+      const d2 = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
+      if (d2 < 0.045) best.push([d2, j]);
+    }
+    best.sort((a, b) => a[0] - b[0]).slice(0, 2).forEach(([, j]) => B.links.push([i, j]));
+  }
+  ui.stripParticles.textContent = B.filler.length + G.nodes.size;
+}
+
+/* ---------- Infokort ---------- */
+const cards = {
+  search: { el: document.getElementById("card-search"), node: null, until: 0 },
+  learned: { el: document.getElementById("card-learned"), node: null, until: 0 },
+  source: { el: document.getElementById("card-source"), node: null, until: 0 },
+};
+function showCard(key, text, nodeId, sticky = false) {
+  const c = cards[key];
+  c.el.querySelector(".s").textContent = text;
+  c.node = nodeId;
+  c.until = sticky ? Infinity : S.t + 9;
+  c.el.classList.add("show");
+  c.el.classList.remove("dim");
+}
+function updateCards() {
+  for (const c of Object.values(cards)) {
+    if (!c.node) continue;
+    if (c.until !== Infinity && S.t > c.until) { c.el.classList.remove("show"); c.node = null; }
+  }
+  if (cards.learned.node && S.t - (G.nodes.get(cards.learned.node)?.born || 0) > 25) cards.learned.el.classList.add("dim");
+}
+
+/* ---------- Tegning ---------- */
 const ctx = ui.hud.getContext("2d");
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let W = 0, H = 0, DPR = 1;
+let W = 0, H = 0, DPR = 1, CX = 0, CY = 0;
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   const r = ui.hud.getBoundingClientRect();
@@ -387,150 +589,205 @@ new ResizeObserver(resize).observe(ui.hud);
 
 const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
 const lerp = (a, b, k) => a + (b - a) * k;
+const mix = (c1, c2, k) => [lerp(c1[0], c2[0], k), lerp(c1[1], c2[1], k), lerp(c1[2], c2[2], k)];
 
-function ring(r, width, alpha, dash) {
-  ctx.beginPath();
-  ctx.setLineDash(dash || []);
-  ctx.lineWidth = width;
-  ctx.strokeStyle = rgba(S.color, alpha);
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
+let cosY = 1, sinY = 0, cosX = 1, sinX = 0, SCALE = 1;
+const FOCAL = 3.2;
+/* 3D -> skjerm. Returnerer [x, y, dybde 0 (bak) .. 1 (foran), perspektivfaktor]. */
+function project(p) {
+  const x1 = p[0] * cosY - p[2] * sinY, z1 = p[0] * sinY + p[2] * cosY;
+  const y2 = p[1] * cosX - z1 * sinX, z2 = p[1] * sinX + z1 * cosX;
+  const f = FOCAL / (FOCAL - z2);
+  return [CX + x1 * f * SCALE, CY + y2 * f * SCALE, (z2 + 1) / 2, f];
 }
-function arc(r, from, to, width, alpha) {
-  ctx.beginPath();
-  ctx.lineWidth = width;
-  ctx.strokeStyle = rgba(S.color, alpha);
-  ctx.arc(0, 0, r, from, to);
-  ctx.stroke();
+
+function drawFloor(sc) {
+  // Perspektivgulv under hjernen, som et rutenett som forsvinner i horisonten.
+  const horizon = CY + B.R * 0.95, bottom = H;
+  if (bottom - horizon < 20) return;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 9; i++) {
+    const t = (i + ((S.t * 0.15) % 1)) / 9, y = horizon + Math.pow(t, 2) * (bottom - horizon);
+    ctx.strokeStyle = rgba(sc, 0.05 + 0.1 * t);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  for (let i = -12; i <= 12; i++) {
+    ctx.strokeStyle = rgba(sc, 0.07);
+    ctx.beginPath(); ctx.moveTo(CX + i * 18, horizon); ctx.lineTo(CX + i * 140, bottom); ctx.stroke();
+  }
 }
+
+let hover = null;
 
 function draw(dt) {
   const st = STATES[S.state];
-  const k = Math.min(1, dt * 4);
-  for (let i = 0; i < 3; i++) S.color[i] = lerp(S.color[i], st.color[i], k);
-  S.speed = lerp(S.speed, reduced ? st.speed * 0.25 : st.speed, k);
+  const k = Math.min(1, dt * 2.5);
+  S.color = mix(S.color, st.color, k);
   S.glow = lerp(S.glow, st.glow, k);
+  S.spin = lerp(S.spin, reduced ? 0.02 : st.spin, k);
   S.level = lerp(S.level, S.levelTarget, Math.min(1, dt * 14));
   S.t += dt;
-  const sp = S.speed;
-  S.rot[0] += dt * 0.08 * sp;
-  S.rot[1] -= dt * 0.22 * sp;
-  S.rot[2] += dt * 0.5 * sp;
-  S.rot[3] -= dt * 1.6 * sp;
+  if (S.activity?.fadeAt && S.t > S.activity.fadeAt + 1.2) S.activity = null;
+  if (!B.drag) B.rotY += dt * (S.spin + B.userSpin);
+  B.userSpin *= 0.96;
+  cosY = Math.cos(B.rotY); sinY = Math.sin(B.rotY); cosX = Math.cos(B.rotX); sinX = Math.sin(B.rotX);
+
+  B.R = Math.max(60, Math.min(W * 0.36, H * 0.33));
+  CX = W / 2; CY = H * 0.42;
+  SCALE = B.R * (1 + 0.05 * Math.sin(S.t * 1.3) * (reduced ? 0 : 1) + 0.07 * S.level);
 
   ctx.clearRect(0, 0, W, H);
-  const R = Math.min(W, H) * 0.44;
-  if (R <= 0) return;
-  ctx.save();
-  ctx.translate(W / 2, H / 2);
-  ctx.lineCap = "round";
-  ctx.shadowColor = rgba(S.color, 0.9);
-  ctx.shadowBlur = 8 + 14 * S.glow;
+  const sc = S.color;
+  drawFloor(sc);
 
-  // 1. Ytterring med skalastreker
-  ctx.save(); ctx.rotate(S.rot[0]);
-  ring(R, 1, 0.35);
-  for (let i = 0; i < 180; i++) {
-    const a = (i / 180) * Math.PI * 2, long = i % 15 === 0, mid = i % 5 === 0;
-    const len = long ? 14 : mid ? 8 : 4;
+  // Glød i midten av skyen.
+  const halo = ctx.createRadialGradient(CX, CY, 0, CX, CY, B.R * 1.25);
+  halo.addColorStop(0, rgba(mix(sc, [255, 255, 255], 0.25), 0.16 + 0.14 * S.glow + 0.2 * S.level));
+  halo.addColorStop(0.45, rgba(sc, 0.06 + 0.06 * S.glow));
+  halo.addColorStop(1, rgba(sc, 0));
+  ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = "lighter";
+
+  // Fyllpartikler: projiser, og la dem blinke etter tilstand.
+  const pts = B.filler.map(f => project(f.p));
+  const thinking = S.state === "thinking" || S.state === "searching";
+  if (thinking && !reduced && Math.random() < dt * 40) B.filler[Math.floor(Math.random() * B.filler.length)].flash = 1;
+
+  // Tråder mellom fyllpartikler, i tre lag etter dybde (én strek per lag).
+  const linkColor = mix(sc, [255, 230, 255], 0.2);
+  for (let layer = 0; layer < 3; layer++) {
     ctx.beginPath();
-    ctx.lineWidth = long ? 2 : 1;
-    ctx.strokeStyle = rgba(S.color, long ? 0.9 : 0.4);
-    ctx.moveTo(Math.cos(a) * R, Math.sin(a) * R);
-    ctx.lineTo(Math.cos(a) * (R - len), Math.sin(a) * (R - len));
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Små satellitter utenfor ringen
-  for (let i = 0; i < 3; i++) {
-    const a = S.rot[1] * 0.7 + i * 2.094;
-    ctx.beginPath(); ctx.fillStyle = rgba(S.color, 0.9);
-    ctx.arc(Math.cos(a) * (R + 10), Math.sin(a) * (R + 10), 2.2, 0, Math.PI * 2); ctx.fill();
-  }
-
-  // 2. Segmentert bue-ring
-  ctx.save(); ctx.rotate(S.rot[1]);
-  const segs = [[0, 0.95], [1.15, 1.75], [2.0, 3.3], [3.55, 4.1], [4.4, 5.9]];
-  for (const [a, b] of segs) arc(R * 0.9, a, b, 3, 0.75);
-  ctx.restore();
-
-  // 3. Radial equalizer som reagerer på lydnivå
-  const bars = 120, rIn = R * 0.74;
-  for (let i = 0; i < bars; i++) {
-    const a = (i / bars) * Math.PI * 2 + S.rot[0] * 0.5;
-    const n = 0.5 + 0.5 * Math.sin(S.t * 6 + i * 0.7) * Math.sin(S.t * 2.3 + i * 0.13);
-    const idle = 0.05 + 0.04 * Math.sin(S.t * 1.2 + i * 0.3);
-    const len = R * (0.02 + 0.13 * Math.max(idle, S.level * (0.35 + 0.65 * n)));
-    ctx.beginPath();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = rgba(S.color, 0.35 + 0.55 * S.level);
-    ctx.moveTo(Math.cos(a) * rIn, Math.sin(a) * rIn);
-    ctx.lineTo(Math.cos(a) * (rIn + len), Math.sin(a) * (rIn + len));
+    for (const [i, j] of B.links) {
+      const a = pts[i], b = pts[j], depth = (a[2] + b[2]) / 2;
+      if (Math.min(2, Math.floor(depth * 3)) !== layer) continue;
+      ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+    }
+    ctx.lineWidth = 0.6 + layer * 0.15;
+    ctx.strokeStyle = rgba(linkColor, (0.035 + 0.05 * layer) * (0.7 + 0.5 * S.glow));
     ctx.stroke();
   }
 
-  // 4. Stiplet ring + komet når han tenker
-  ctx.save(); ctx.rotate(S.rot[2]);
-  ring(R * 0.64, 1.5, 0.5, [2, 8]);
-  ctx.restore();
-  if (S.state === "thinking" || S.state === "searching") {
-    const head = S.rot[3];
-    for (let i = 0; i < 24; i++) {
-      arc(R * 0.64, head - i * 0.06, head - i * 0.06 + 0.07, 4, (1 - i / 24) * 0.95);
+  // Punktene, gruppert i lysstyrketrinn så de kan tegnes med få kall.
+  const buckets = [[], [], [], [], [], []];
+  for (let i = 0; i < B.filler.length; i++) {
+    const f = B.filler[i], p = pts[i];
+    f.flash *= Math.exp(-dt * 3);
+    let a = 0.25 + 0.55 * p[2];
+    if (!reduced) a *= 0.75 + 0.25 * Math.sin(S.t * 1.7 + f.phase);
+    if (S.state === "speaking") {
+      // Bølger som går gjennom skyen når han snakker.
+      const r = Math.hypot(f.p[0], f.p[1], f.p[2]);
+      a += Math.max(0, Math.sin(r * 9 - S.t * 6)) * 0.45 * (0.3 + S.level);
     }
+    if (S.state === "listening") a += S.level * 0.4 * (1 - Math.hypot(f.p[0], f.p[1], f.p[2]));
+    a += f.flash * 0.9;
+    a *= Math.min(1, (S.t - f.born) / 1.5);
+    buckets[Math.max(0, Math.min(5, Math.floor(a * 6)))].push([p[0], p[1], f.size * p[3] * (0.8 + p[2] * 0.7)]);
   }
-
-  // Radarsveip når han søker
-  if (S.state === "searching") {
-    const a = S.t * 2.4;
-    const g = ctx.createConicGradient ? ctx.createConicGradient(a - 0.9, 0, 0) : null;
-    if (g) {
-      g.addColorStop(0, rgba(S.color, 0)); g.addColorStop(0.14, rgba(S.color, 0.28)); g.addColorStop(0.145, rgba(S.color, 0));
-      ctx.beginPath(); ctx.fillStyle = g; ctx.moveTo(0, 0); ctx.arc(0, 0, R * 0.86, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-
-  // 5. Indre ring med markører
-  ctx.save(); ctx.rotate(-S.rot[0] * 2);
-  ring(R * 0.52, 1, 0.45);
-  for (let i = 0; i < 4; i++) {
-    ctx.save(); ctx.rotate(i * Math.PI / 2);
-    ctx.beginPath(); ctx.fillStyle = rgba(S.color, 0.9);
-    ctx.moveTo(R * 0.52 - 7, 0); ctx.lineTo(R * 0.52 + 3, -5); ctx.lineTo(R * 0.52 + 3, 5); ctx.fill();
-    ctx.restore();
-  }
-  ctx.restore();
-
-  // 6. Kjernen
-  const pulse = 1 + 0.05 * Math.sin(S.t * 2) + 0.18 * S.level;
-  const rc = R * 0.36 * pulse;
-  const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, rc);
-  grd.addColorStop(0, rgba([255, 255, 255], 0.22 + 0.25 * S.glow));
-  grd.addColorStop(0.35, rgba(S.color, 0.18 + 0.2 * S.glow));
-  grd.addColorStop(1, rgba(S.color, 0));
-  ctx.shadowBlur = 0;
-  ctx.beginPath(); ctx.fillStyle = grd; ctx.arc(0, 0, rc, 0, Math.PI * 2); ctx.fill();
-  ctx.shadowBlur = 8 + 14 * S.glow;
-  ring(R * 0.36, 2, 0.85);
-  ring(R * 0.33, 1, 0.3);
-
-  // Bølgeform over kjernen når han snakker
-  if (S.state === "speaking" || S.level > 0.02) {
+  const dotColor = mix(sc, [255, 255, 255], 0.35);
+  buckets.forEach((list, b) => {
+    if (!list.length) return;
+    ctx.fillStyle = rgba(dotColor, (b + 0.5) / 6);
     ctx.beginPath();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = rgba(S.color, 0.85);
-    const w = R * 0.56;
-    for (let x = -w / 2; x <= w / 2; x += 2) {
-      const env = Math.cos((x / w) * Math.PI); // smalner av mot kantene
-      const y = env * S.level * R * 0.09 *
-        (Math.sin(x * 0.09 + S.t * 9) + 0.6 * Math.sin(x * 0.21 - S.t * 13) + 0.3 * Math.sin(x * 0.5 + S.t * 5));
-      x === -w / 2 ? ctx.moveTo(x, y + R * 0.2) : ctx.lineTo(x, y + R * 0.2);
-    }
-    ctx.stroke();
+    for (const [x, y, s] of list) { ctx.moveTo(x + s, y); ctx.arc(x, y, s, 0, 6.2832); }
+    ctx.fill();
+  });
+
+  // De ekte nodene og kantene mellom dem.
+  for (const n of G.nodes.values()) {
+    const grow = n.fresh ? Math.min(1, (S.t - n.born) / 1.2) : 1;
+    n.q = [lerp(n.q[0], n.p[0], 0.05 + 0.1 * grow), lerp(n.q[1], n.p[1], 0.05 + 0.1 * grow), lerp(n.q[2], n.p[2], 0.05 + 0.1 * grow)];
+    n.s = project(n.q);
   }
-  ctx.restore();
+  const act = S.activity;
+  const fade = act?.fadeAt ? Math.max(0, 1 - (S.t - act.fadeAt) / 1.2) : 1;
+  const reach = act ? Math.min(act.path.length - 1, (S.t - act.t0) * 2.2) : 0;
+  const lit = new Set(), litEdges = new Set();
+  if (act) act.path.forEach((id, i) => { if (i <= reach + 0.01) lit.add(id); if (i) litEdges.add(act.path[i - 1] + ">" + id); });
+
+  const edgeColor = mix(sc, [255, 255, 255], 0.3);
+  ctx.beginPath();
+  for (const [ia, ib] of G.edges) {
+    const a = G.nodes.get(ia).s, b = G.nodes.get(ib).s;
+    ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+  }
+  ctx.lineWidth = 0.9; ctx.strokeStyle = rgba(edgeColor, 0.12 + 0.12 * S.glow); ctx.stroke();
+
+  if (act) {
+    for (let i = 1; i < act.path.length; i++) {
+      const shown = Math.max(0, Math.min(1, reach - (i - 1)));
+      if (!shown) continue;
+      const a = G.nodes.get(act.path[i - 1]).s, b = G.nodes.get(act.path[i]).s;
+      ctx.beginPath(); ctx.lineWidth = 2.2; ctx.strokeStyle = rgba(mix(sc, [255, 255, 255], 0.4), 0.9 * fade);
+      ctx.shadowColor = rgba(sc, 1); ctx.shadowBlur = 14;
+      ctx.moveTo(a[0], a[1]); ctx.lineTo(lerp(a[0], b[0], shown), lerp(a[1], b[1], shown)); ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    if (reach >= act.path.length - 1 && !act.fadeAt) {
+      // En puls som går ut langs stien igjen og igjen mens han leter.
+      const segs = act.path.length - 1, p = ((S.t - act.t0) * 1.5) % segs, i = Math.floor(p);
+      const a = G.nodes.get(act.path[i]).q, b = G.nodes.get(act.path[i + 1]).q, f = p - i;
+      const s = project([lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f)]);
+      glowDot(s[0], s[1], 3.5, sc, 1);
+    }
+  }
+
+  // Noder bakfra og fram, så de foran dekker de bak.
+  const order = [...G.nodes.values()].sort((a, b) => a.s[2] - b.s[2]);
+  ctx.textAlign = "center";
+  for (const n of order) {
+    const ty = TYPES[n.type] || TYPES.content;
+    const isLit = lit.has(n.id), depth = n.s[2];
+    const grow = n.fresh ? Math.min(1, (S.t - n.born) / 1.2) : 1;
+    let r = (ty.r + Math.min(2.5, Math.log2((n.uses || 0) + 1))) * n.s[3] * (0.7 + depth * 0.5) * grow;
+    if (n.type === "core") r *= 1.2 + 0.08 * Math.sin(S.t * 2) + 0.5 * S.level;
+    let color = mix(ty.color, sc, n.type === "core" ? 0.55 : 0.3);
+    if (isLit && n.type !== "core") { color = mix(color, [255, 255, 255], 0.45); r *= 1.5 + 0.2 * Math.sin(S.t * 6) * fade; }
+    glowDot(n.s[0], n.s[1], Math.max(0.6, r), color, (0.45 + 0.55 * depth) * (isLit ? 1 : 0.9),
+            n.type === "core" ? 18 + 24 * S.level : isLit ? 18 : n.type === "connector" || n.type === "hub" ? 10 : 5);
+    if (n.fresh && S.t - n.born < 2) {
+      const t = (S.t - n.born) / 2;
+      ctx.beginPath(); ctx.lineWidth = 1.4; ctx.strokeStyle = rgba(ty.color, 1 - t);
+      ctx.arc(n.s[0], n.s[1], r + 4 + t * 34, 0, 6.2832); ctx.stroke();
+    }
+    const big = n.type === "connector" || n.type === "hub";
+    if ((big || isLit || n === hover || (n.type === "content" && depth > 0.45)) && n.type !== "core") {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.font = `${big ? 600 : 500} ${big ? 13 : 12}px Rajdhani, "Segoe UI", sans-serif`;
+      ctx.fillStyle = isLit || n === hover ? "rgba(255,255,255,.96)" : `rgba(236,224,250,${0.25 + 0.6 * depth})`;
+      ctx.fillText(n.label, n.s[0], n.s[1] - r - 6);
+      ctx.globalCompositeOperation = "lighter";
+    }
+  }
+  ctx.globalCompositeOperation = "source-over";
+
+  drawCardLines(sc);
+  updateCards();
+}
+
+function glowDot(x, y, r, color, alpha, blur = 12) {
+  ctx.beginPath(); ctx.fillStyle = rgba(color, alpha);
+  ctx.shadowColor = rgba(color, 1); ctx.shadowBlur = blur;
+  ctx.arc(x, y, r, 0, 6.2832); ctx.fill(); ctx.shadowBlur = 0;
+}
+
+/* Linjer fra infokortene inn til noden de handler om (rett ned, så bort), som i en HUD. */
+function drawCardLines(sc) {
+  const box = ui.core.getBoundingClientRect();
+  for (const c of Object.values(cards)) {
+    if (!c.node || !c.el.classList.contains("show")) continue;
+    const n = G.nodes.get(c.node);
+    if (!n?.s) continue;
+    const r = c.el.getBoundingClientRect();
+    const left = r.left - box.left < W / 2;
+    const ax = left ? r.right - box.left : r.left - box.left, ay = r.bottom - box.top - 6;
+    const elbowX = ax + (left ? 24 : -24);
+    ctx.beginPath(); ctx.lineWidth = 1;
+    ctx.strokeStyle = rgba(sc, c.el.classList.contains("dim") ? 0.25 : 0.55);
+    ctx.moveTo(ax, ay); ctx.lineTo(elbowX, ay); ctx.lineTo(elbowX, n.s[1]); ctx.lineTo(n.s[0], n.s[1]); ctx.stroke();
+    ctx.beginPath(); ctx.fillStyle = rgba(sc, 0.9); ctx.arc(n.s[0], n.s[1], 2.5, 0, 6.2832); ctx.fill();
+  }
 }
 
 let last = performance.now();
@@ -541,6 +798,55 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+/* ---------- Dra, pek og klikk ---------- */
+function nodeAt(clientX, clientY) {
+  const r = ui.hud.getBoundingClientRect(), mx = clientX - r.left, my = clientY - r.top;
+  let best = null, bestD = 12;
+  for (const n of G.nodes.values()) {
+    if (!n.s) continue;
+    const d = Math.hypot(n.s[0] - mx, n.s[1] - my) - (n.type === "core" ? 14 : 0) - n.s[2] * 3;
+    if (d < bestD) { best = n; bestD = d; }
+  }
+  return best;
+}
+ui.hud.addEventListener("pointerdown", e => {
+  B.drag = { x: e.clientX, y: e.clientY, moved: 0 };
+  ui.hud.setPointerCapture(e.pointerId);
+});
+ui.hud.addEventListener("pointermove", e => {
+  if (B.drag) {
+    const dx = e.clientX - B.drag.x, dy = e.clientY - B.drag.y;
+    B.drag.moved += Math.abs(dx) + Math.abs(dy);
+    B.rotY += dx * 0.008; B.rotX = Math.max(-1.2, Math.min(1.2, B.rotX + dy * 0.006));
+    B.userSpin = dx * 0.02;
+    B.drag.x = e.clientX; B.drag.y = e.clientY;
+    ui.hud.classList.toggle("dragging", B.drag.moved > 4);
+    return;
+  }
+  hover = nodeAt(e.clientX, e.clientY);
+  ui.hud.classList.toggle("over-core", hover?.id === "eddie" && connected);
+  if (!hover) { ui.tooltip.classList.remove("show"); return; }
+  const type = TYPES[hover.type]?.name || hover.type;
+  const used = hover.uses ? ` · brukt ${hover.uses} ${hover.uses === 1 ? "gang" : "ganger"}` : "";
+  ui.tooltip.innerHTML = "<b></b><span></span><small></small>";
+  ui.tooltip.querySelector("b").textContent = hover.id === "eddie" ? "Eddie" : hover.label;
+  ui.tooltip.querySelector("span").textContent = hover.id === "eddie"
+    ? (connected ? "Klikk for å starte eller avslutte en samtale" : "Mikaels personlige assistent")
+    : hover.info && hover.info !== hover.label ? hover.info : "";
+  ui.tooltip.querySelector("small").textContent = type + used;
+  const r = ui.core.getBoundingClientRect();
+  ui.tooltip.style.left = Math.min(e.clientX - r.left + 14, r.width - 270) + "px";
+  ui.tooltip.style.top = (e.clientY - r.top + 14) + "px";
+  ui.tooltip.classList.add("show");
+});
+ui.hud.addEventListener("pointerup", e => {
+  const click = B.drag && B.drag.moved < 5;
+  B.drag = null;
+  ui.hud.classList.remove("dragging");
+  if (click && nodeAt(e.clientX, e.clientY)?.id === "eddie") toggleTalk();
+});
+ui.hud.addEventListener("pointerleave", () => { hover = null; ui.tooltip.classList.remove("show"); });
 
 /* ---------- Ventetidsgraf ---------- */
 function drawSpark() {
@@ -555,7 +861,7 @@ function drawSpark() {
   g.strokeStyle = "rgba(255,181,71,.45)"; g.setLineDash([3, 4]); g.beginPath();
   g.moveTo(0, y(1.5)); g.lineTo(w, y(1.5)); g.stroke(); g.setLineDash([]);
   if (S.latencies.length < 2) return;
-  g.strokeStyle = "#4fd8ff"; g.lineWidth = 2; g.shadowColor = "#4fd8ff"; g.shadowBlur = 6; g.beginPath();
+  g.strokeStyle = "#e9a8ff"; g.lineWidth = 2; g.shadowColor = "#e9a8ff"; g.shadowBlur = 6; g.beginPath();
   S.latencies.forEach((v, i) => {
     const x = (i / (S.latencies.length - 1)) * w;
     i ? g.lineTo(x, y(v)) : g.moveTo(x, y(v));
@@ -563,26 +869,47 @@ function drawSpark() {
   g.stroke();
 }
 
+/* ---------- Demohjernen: samme form som knowledge_graph.py lager ---------- */
+const DEMO_GRAPH = (() => {
+  const nodes = [{ id: "eddie", label: "Eddie", type: "core", info: "Mikaels personlige assistent" }];
+  const edges = [];
+  const add = (id, label, type, parent, info = "") => { nodes.push({ id, label, type, info, uses: 0 }); edges.push([parent, id]); };
+  add("connector:web", "Nett", "connector", "eddie", "Søk og hent sider på nettet");
+  add("tool:web:WebSearch", "Nettsøk", "tool", "connector:web");
+  add("tool:web:WebFetch", "Hent nettside", "tool", "connector:web");
+  add("connector:ssb", "SSB", "connector", "eddie", "Offisiell norsk statistikk fra Statistisk sentralbyrå");
+  for (const t of ["sok_tabeller", "tabellinfo", "finn_verdi", "hent_data", "boligpriser"]) add(`tool:ssb:${t}`, t, "tool", "connector:ssb");
+  add("hub:instructions", "Instrukser", "hub", "eddie", "Eddies personlighet og regler (CLAUDE.md)");
+  for (const k of ["Reply language", "Personality", "Talk like a person", "How to reply in voice mode", "About Mikael",
+                   "Date and time", "Looking things up", "Statistics from SSB", "Your own instructions", "Actions"])
+    add(`knowledge:${k}`, k, "knowledge", "hub:instructions", k);
+  add("hub:memory", "Minne", "hub", "eddie", "Det Eddie har lagt merke til om deg");
+  add("memory:lag", "Favorittlag: Brighton", "memory", "hub:memory");
+  return { nodes, edges };
+})();
+
 /* ---------- Startstatus ---------- */
-Eddie.setStatus("brain", "Claude Haiku 5.5", null);
+Eddie.setStatus("brain", "Claude Sonnet 5.5", null);
 Eddie.setStatus("stt", "NB-Whisper small · GPU", null);
 Eddie.setStatus("tts", "ElevenLabs · Eric", null);
 Eddie.setStatus("mic", "Venter på Eddie", null);
 Eddie.setStatus("link", "Kobler til …", null);
 Eddie.setState("idle");
+Eddie.graph(DEMO_GRAPH, true);
 
 /* ---------- Tilkobling til den lokale Eddie ---------- */
 const params = new URLSearchParams(location.search);
 // Servert av Eddie selv (http://localhost:8765): samme adresse. Ellers (fil, GitHub Pages): Eddie på denne PC-en.
 const servedByEddie = location.protocol === "http:" && ["localhost", "127.0.0.1"].includes(location.hostname);
 const WS_URL = params.get("ws") || (servedByEddie ? `ws://${location.host}/ws` : "ws://localhost:8765/ws");
-let ws = null, connected = false;
+let ws = null, connected = false, realGraph = false;
 const controls = document.getElementById("controls");
 
 function setConnection(ok) {
   connected = ok;
   ui.connDot.className = "dot " + (ok ? "ok" : "warn");
   ui.connText.textContent = ok ? "Tilkoblet Eddie" : "Demomodus";
+  ui.stripLink.textContent = ok ? "online" : "demo";
   Eddie.setStatus("link", ok ? "Tilkoblet " + WS_URL.replace(/^wss?:\/\//, "").replace(/\/ws$/, "")
                              : "Frakoblet – demomodus", ok ? true : null);
 }
@@ -592,16 +919,15 @@ function connect() {
   ws.onopen = () => {
     stopDemo();
     setConnection(true);
+    realGraph = false; // den ekte grafen erstatter demohjernen når den kommer
     controls.classList.add("hidden"); // demoknappene gir ikke mening når den ekte Eddie styrer
     talkBtn.hidden = false;
-    coreEl.classList.add("clickable");
     setConversation(false);
   };
   ws.onclose = () => {
     if (connected) Eddie.setState("idle");
     controls.classList.remove("hidden");
     talkBtn.hidden = true;
-    coreEl.classList.remove("clickable");
     setConnection(false);
     setTimeout(connect, 3000);
   };
@@ -616,13 +942,14 @@ function connect() {
       case "status": Eddie.setStatus(m.key, m.value, m.ok); break;
       case "latency": Eddie.latency(m.seconds, m.stt, m.brain); break;
       case "conversation": setConversation(!!m.active); break;
+      case "graph": Eddie.graph(m, !realGraph); realGraph = true; break;
+      case "activity": Eddie.activity(m.path || []); break;
     }
   };
 }
 
 /* ---------- Snakk / Avslutt fra portalen ---------- */
 const talkBtn = document.getElementById("talk");
-const coreEl = document.querySelector(".core");
 let conversation = false;
 
 function setConversation(active) {
@@ -630,19 +957,15 @@ function setConversation(active) {
   talkBtn.textContent = active ? "Avslutt" : "Snakk";
   talkBtn.classList.toggle("active", active);
   talkBtn.setAttribute("aria-pressed", String(active));
-  if (!active && connected) ui.hint.textContent = "Klikk «Snakk» eller hold høyre Ctrl";
+  if (connected) ui.hint.textContent = active
+    ? "Kort trykk på høyre Ctrl avslutter · hold inne for å snakke"
+    : "Klikk «Snakk» eller trykk kort på høyre Ctrl";
 }
 function toggleTalk() {
   if (!connected || !ws || ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify({ type: "command", action: conversation ? "stop" : "talk" }));
 }
 talkBtn.addEventListener("click", toggleTalk);
-ui.hud.addEventListener("click", e => {
-  // Bare et klikk på selve kjernen, ikke hvor som helst i ringene.
-  const r = ui.hud.getBoundingClientRect();
-  const d = Math.hypot(e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2);
-  if (d < Math.min(r.width, r.height) * 0.44 * 0.4) toggleTalk();
-});
 setConnection(false);
 connect();
 
@@ -679,12 +1002,18 @@ async function listen(run, text) {
   return true;
 }
 
+// Hvert oppslag lyser opp stien gjennom hjernen; nytt innhold blir nye noder, slik Eddie gjør på ekte.
 const SCRIPT = [
-  { user: "Hei Eddie, jeg er litt sliten i dag.", think: 1100,
+  { user: "Hei Eddie, jeg er litt sliten i dag.", think: 1400,
     eddie: "Sorry to hear that. Long days wear you down, especially with a lot going on at once. Was it the work, or just a heavy week?" },
-  { user: "Har jobbet med en presentasjon om boligmarkedet hele dagen.", think: 900,
-    eddie: "That explains it. Presentations eat a day faster than anyone expects. Is it nearly done, or still in the part where nothing fits together?" },
-  { user: "Hvordan blir været i Oslo i morgen?", think: 600, search: 2600,
+  { user: "Hva koster kvadratmeteren i Oslo nå?", think: 700, search: 3200,
+    path: ["eddie", "connector:ssb", "tool:ssb:boligpriser", "content:table:14310", "content:place:oslo"],
+    learn: [["content:table:14310", "Boligpriser (14310)", "tool:ssb:boligpriser", "SSB-tabell 14310"],
+            ["content:place:oslo", "Oslo", "content:table:14310", "Sted"]],
+    eddie: "About a hundred and two thousand kroner per square metre, says SSB for the third quarter. That's up about two percent on a year ago." },
+  { user: "Hvordan blir været i Oslo i morgen?", think: 600, search: 2800,
+    path: ["eddie", "connector:web", "tool:web:WebFetch", "content:site:yr.no"],
+    learn: [["content:site:yr.no", "yr.no", "tool:web:WebFetch", "Nettsted yr.no"]],
     eddie: "Cool and damp. Two to nine degrees, fog in the morning and a bit of rain around midday. I'd bring a jacket." },
 ];
 
@@ -699,6 +1028,11 @@ async function runDemo() {
     if (step.search) {
       if (!(await speak(run, "One moment, let me check."))) return;
       Eddie.setState("searching");
+      if (step.learn) Eddie.graph({
+        nodes: step.learn.map(([id, label, , info]) => ({ id, label, type: "content", info, uses: 1 })),
+        edges: step.learn.map(([id, , parent]) => [parent, id]),
+      });
+      Eddie.activity(step.path);
       await sleep(step.search);
     }
     if (run !== demoRun) return;
@@ -721,6 +1055,7 @@ document.querySelectorAll("button[data-state]").forEach(b => b.addEventListener(
   Eddie.setState(b.dataset.state);
   if (b.dataset.state === "listening") fakeLevel(0.1, 0.5);
   if (b.dataset.state === "speaking") fakeLevel(0.35, 0.6);
+  if (b.dataset.state === "searching") Eddie.activity(["eddie", "connector:ssb", "tool:ssb:boligpriser"]);
 }));
 document.addEventListener("keydown", e => {
   if (e.target.closest("input, textarea")) return;
