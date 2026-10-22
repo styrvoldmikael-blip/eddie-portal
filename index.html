@@ -186,10 +186,16 @@
   @keyframes breathe { 50% { inset: -12px; } }
   /* Demp stemmen: liten knapp til høyre for mikrofonen */
   .mute {
-    position: absolute; left: calc(50% + 66px); top: 23px; width: 38px; height: 38px; padding: 0; border-radius: 50%;
-    display: grid; place-items: center; pointer-events: auto; color: var(--text-dim); background: rgba(14, 8, 22, .85);
+    position: absolute; left: calc(50% + 70px); top: 19px; width: 46px; height: 46px; padding: 0; border-radius: 50%;
+    display: grid; place-items: center; pointer-events: auto; color: #f3e8ff; background: rgba(14, 8, 22, .9);
+    border: 1px solid var(--state, var(--cyan)); transition: border-color .6s;
   }
-  .mute svg { width: 18px; height: 18px; }
+  .mute svg { width: 22px; height: 22px; }
+  .mute::after {
+    content: "Lyd"; position: absolute; top: 52px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim);
+  }
+  .mute.on::after { content: "Dempet"; color: var(--amber); }
   .mute[hidden] { display: none; }
   .mute .off { display: none; }
   .mute.on { color: var(--amber); border-color: var(--amber); box-shadow: 0 0 12px rgba(255, 181, 71, .35); }
