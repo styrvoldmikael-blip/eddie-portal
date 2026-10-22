@@ -34,8 +34,9 @@
     {"type": "deck", "tittel", "antall", "utkast": "presentasjoner/utkast.html", "arkiv": [{fil, tittel, lagret, lysbilder}],
     }                                                        presentasjonen under arbeid (connectors/presentasjon.py)
     {"type": "deck_open", "path": "presentasjoner/…"}        åpne en presentasjon i visningen nå
+    {"type": "mute", "muted": true}                          stemmen er dempet: Eddie svarer bare med tekst
   Kommandoer til Eddie:
-    {"type": "command", "action": "talk" | "stop"}
+    {"type": "command", "action": "talk" | "stop" | "mute" | "unmute"}
     {"type": "command", "action": "message", "text": "..."}  skrevet melding fra chatten (maks 2000 tegn)
 -->
 <style>
@@ -183,6 +184,17 @@
   .mic.active { box-shadow: 0 0 30px var(--state, var(--cyan)); }
   .mic.active::before { animation: breathe 2.4s ease-in-out infinite; }
   @keyframes breathe { 50% { inset: -12px; } }
+  /* Demp stemmen: liten knapp til høyre for mikrofonen */
+  .mute {
+    position: absolute; left: calc(50% + 66px); top: 23px; width: 38px; height: 38px; padding: 0; border-radius: 50%;
+    display: grid; place-items: center; pointer-events: auto; color: var(--text-dim); background: rgba(14, 8, 22, .85);
+  }
+  .mute svg { width: 18px; height: 18px; }
+  .mute[hidden] { display: none; }
+  .mute .off { display: none; }
+  .mute.on { color: var(--amber); border-color: var(--amber); box-shadow: 0 0 12px rgba(255, 181, 71, .35); }
+  .mute.on .off { display: block; }
+  .mute.on .waves { display: none; }
   .voice .lbl { margin-top: 16px; font-family: var(--mono); font-size: 11px; letter-spacing: .3em; color: var(--state, var(--cyan)); text-transform: uppercase; transition: color .6s; }
   .voice .sub { margin-top: 4px; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--text-dim); text-transform: uppercase; }
   .tooltip {
@@ -342,6 +354,11 @@
       <button class="mic" id="talk" aria-pressed="false" aria-label="Start samtale">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
           <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+      </button>
+      <button class="mute" id="mute" hidden aria-pressed="false" aria-label="Demp Eddies stemme" title="Demp stemmen (Eddie svarer bare med tekst)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="waves" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>
+          <path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
       </button>
       <div class="lbl" id="state-label" role="status">Standby</div>
       <div class="sub" id="brain-sub">Klikk for demo</div>
@@ -1186,6 +1203,7 @@ function connect() {
       case "sources": Eddie.sources(Array.isArray(m.items) ? m.items : [], !!m.pending); break;
       case "visuals": Eddie.visuals(Array.isArray(m.items) ? m.items : []); break;
       case "deck": updateDeck(m); break;
+      case "mute": setMuted(!!m.muted); break;
       case "deck_open": openDeckPath(String(m.path || "")); break;
     }
   };
@@ -1259,7 +1277,18 @@ function toggleTalk() {
   if (!connected) return document.getElementById("demo").click();  // uten Eddie: mikrofonen spiller demoen
   sendCommand({ action: conversation ? "stop" : "talk" });
 }
+const muteBtn = document.getElementById("mute");
+let muted = false;
+function setMuted(on) {
+  muted = on;
+  muteBtn.classList.toggle("on", on);
+  muteBtn.setAttribute("aria-pressed", String(on));
+  muteBtn.setAttribute("aria-label", on ? "Slå på Eddies stemme" : "Demp Eddies stemme");
+  muteBtn.title = on ? "Stemmen er dempet – klikk for å slå den på" : "Demp stemmen (Eddie svarer bare med tekst)";
+}
+muteBtn.addEventListener("click", () => sendCommand({ action: muted ? "unmute" : "mute" }));
 function setChat(enabled) {
+  muteBtn.hidden = !enabled;  // bare når den ekte Eddie er tilkoblet
   chatInput.disabled = chatSend.disabled = !enabled;
   chatInput.placeholder = enabled ? "Skriv til Eddie …" : "Koble til Eddie for å skrive";
 }
