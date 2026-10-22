@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E.D.D.I.E</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='none' stroke='%234fd8ff' stroke-width='4'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%234fd8ff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&display=swap" rel="stylesheet">
+<!--
+  Eddies grensesnitt. Åpnes direkte i nettleseren (file://) eller fra GitHub Pages.
+
+  Når Eddie kjører, serverer han denne siden på http://localhost:8765 og sender hendelser på ws://localhost:8765/ws
+  (overstyr med ?ws=...). Uten tilkobling kjører demomodus.
+  Meldinger fra Eddie (JSON, én per WebSocket-melding):
+    {"type": "state",   "state": "idle" | "listening" | "thinking" | "searching" | "speaking" | "error"}
+    {"type": "level",   "value": 0..1}                       lydnivå (mikrofon når han lytter, stemme når han snakker)
+    {"type": "user",    "text": "..."}                       det Mikael sa
+    {"type": "eddie",   "text": "...", "final": false}       tekstbit fra Eddie; final=true avslutter svaret
+    {"type": "status",  "key": "brain", "value": "...", "ok": true}
+    {"type": "latency", "seconds": 1.9, "stt": 0.4, "brain": 1.2}
+    {"type": "conversation", "active": true}               en samtale pågår (Eddie lytter av seg selv)
+  Kommandoer til Eddie (bare disse to):
+    {"type": "command", "action": "talk" | "stop"}
+-->
+<style>
+  :root {
+    --bg: #02060c;
+    --bg-2: #051220;
+    --cyan: #4fd8ff;
+    --cyan-bright: #b4f2ff;
+    --cyan-dim: rgba(79, 216, 255, 0.28);
+    --cyan-faint: rgba(79, 216, 255, 0.08);
+    --amber: #ffb547;
+    --red: #ff4d5e;
+    --green: #57ffb0;
+    --text: #cfeeff;
+    --text-dim: #6f97ad;
+    --panel: rgba(6, 22, 38, 0.55);
+    --head: "Orbitron", "Segoe UI", system-ui, sans-serif;
+    --body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(ellipse at 50% 45%, #07233a 0%, var(--bg-2) 35%, var(--bg) 75%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 16px;
+    overflow: hidden;
+  }
+  /* Svakt sekskantmønster og skannelinjer, som en projisert HUD. */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'%3E%3Cpath d='M28 0 56 16v32L28 64 0 48V16zM28 64v33' fill='none' stroke='%234fd8ff' stroke-opacity='.06'/%3E%3C/svg%3E");
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,.018) 0 1px, transparent 1px 3px),
+                radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.65) 100%);
+  }
+
+  .app {
+    position: relative; z-index: 1; height: 100%;
+    display: grid;
+    grid-template-columns: minmax(250px, 320px) 1fr minmax(280px, 380px);
+    grid-template-rows: auto 1fr auto;
+    gap: 16px; padding: 18px 24px;
+  }
+
+  /* Toppstripe */
+  header {
+    grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--cyan-dim); padding-bottom: 10px; position: relative;
+  }
+  header::after {
+    content: ""; position: absolute; left: 0; bottom: -1px; width: 180px; height: 2px;
+    background: var(--cyan); box-shadow: 0 0 12px var(--cyan);
+  }
+  .brand { display: flex; align-items: baseline; gap: 14px; }
+  .brand h1 {
+    margin: 0; font-family: var(--head); font-weight: 700; font-size: 26px; letter-spacing: .32em;
+    color: var(--cyan-bright); text-shadow: 0 0 14px rgba(79,216,255,.7);
+  }
+  .brand span { color: var(--text-dim); letter-spacing: .2em; font-size: 13px; text-transform: uppercase; }
+  .clock { text-align: right; font-family: var(--head); }
+  .clock .time { font-size: 22px; letter-spacing: .12em; color: var(--cyan-bright); }
+  .clock .date { font-family: var(--body); font-size: 13px; letter-spacing: .18em; color: var(--text-dim); text-transform: uppercase; }
+
+  /* HUD-paneler med hjørnemarkeringer */
+  .panel {
+    position: relative; background: var(--panel); border: 1px solid var(--cyan-faint);
+    padding: 16px 18px; backdrop-filter: blur(3px); min-height: 0;
+    display: flex; flex-direction: column;
+  }
+  .panel::before, .panel::after {
+    content: ""; position: absolute; width: 16px; height: 16px; border: 2px solid var(--cyan);
+    filter: drop-shadow(0 0 4px var(--cyan));
+  }
+  .panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+  .panel::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+  .panel h2 {
+    margin: 0 0 12px; font-family: var(--head); font-size: 12px; font-weight: 500; letter-spacing: .3em;
+    color: var(--cyan); display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel h2 small { font-family: var(--body); letter-spacing: .12em; color: var(--text-dim); font-size: 12px; }
+
+  /* Systempanel */
+  .status { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .status li { display: grid; grid-template-columns: 10px 1fr; gap: 10px; align-items: start; }
+  .dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--text-dim); }
+  .dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.warn { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  .dot.err { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .status .k { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
+  .status .v { font-size: 16px; font-weight: 500; color: var(--text); }
+
+  .metric { margin-top: 18px; border-top: 1px solid var(--cyan-faint); padding-top: 14px; }
+  .metric .row { display: flex; justify-content: space-between; align-items: baseline; }
+  .metric .big { font-family: var(--head); font-size: 30px; color: var(--cyan-bright); text-shadow: 0 0 10px rgba(79,216,255,.5); }
+  .metric .big.slow { color: var(--amber); text-shadow: 0 0 10px rgba(255,181,71,.5); }
+  .metric .lbl { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
+  .metric .split { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  #spark { width: 100%; height: 54px; margin-top: 8px; display: block; }
+
+  /* Midten: reaktoren */
+  .core {
+    position: relative; display: grid; place-items: center; min-height: 0; min-width: 0;
+  }
+  #hud { width: 100%; height: 100%; display: block; }
+  .core.clickable #hud { cursor: pointer; }
+  .talk {
+    position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%);
+    font-size: 13px; letter-spacing: .4em; padding: 12px 28px 12px calc(28px + .4em);
+    border-color: var(--cyan); color: var(--cyan-bright); background: rgba(79,216,255,.08);
+    box-shadow: 0 0 18px rgba(79,216,255,.25), inset 0 0 12px rgba(79,216,255,.15);
+  }
+  .talk.active { border-color: var(--amber); color: var(--amber); background: rgba(255,181,71,.08);
+    box-shadow: 0 0 18px rgba(255,181,71,.3), inset 0 0 12px rgba(255,181,71,.15); }
+  .talk.active:hover { background: rgba(255,181,71,.18); color: #ffd79a; }
+  .core-label {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    text-align: center; pointer-events: none;
+  }
+  .core-label .name { font-family: var(--head); font-size: 15px; letter-spacing: .5em; color: var(--cyan-bright); padding-left: .5em; }
+  .core-label .state {
+    margin-top: 6px; font-family: var(--head); font-size: 11px; letter-spacing: .4em; padding-left: .4em;
+    color: var(--state-color, var(--cyan)); text-shadow: 0 0 10px var(--state-color, var(--cyan));
+  }
+
+  /* Samtalepanel */
+  .log { overflow-y: auto; flex: 1; min-height: 0; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--cyan-dim) transparent; }
+  .msg { margin: 0 0 14px; animation: fadein .35s ease-out; }
+  .msg .who { font-family: var(--head); font-size: 10px; letter-spacing: .3em; color: var(--text-dim); display: flex; gap: 10px; }
+  .msg.eddie .who { color: var(--cyan); }
+  .msg .txt { font-size: 17px; line-height: 1.35; margin-top: 3px; }
+  .msg.user .txt { color: #e6f6ff; }
+  .msg.eddie .txt { color: var(--cyan-bright); }
+  .msg.eddie.live .txt::after { content: "▍"; color: var(--cyan); animation: blink 1s steps(2) infinite; }
+  .empty { color: var(--text-dim); font-size: 15px; letter-spacing: .05em; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px); } }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Bunnstripe: undertekst og demo */
+  footer {
+    grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 16px;
+    border-top: 1px solid var(--cyan-faint); padding-top: 12px;
+  }
+  .subtitle { min-height: 52px; }
+  .subtitle .line { font-size: 22px; font-weight: 500; color: var(--cyan-bright); text-shadow: 0 0 12px rgba(79,216,255,.35); line-height: 1.25; }
+  .subtitle .hint { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
+  .controls .conn { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-right: 8px; display: flex; align-items: center; gap: 8px; }
+  button {
+    font-family: var(--head); font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--cyan); background: rgba(79,216,255,.05); border: 1px solid var(--cyan-dim);
+    padding: 8px 10px; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
+  }
+  button:hover { background: rgba(79,216,255,.15); color: var(--cyan-bright); box-shadow: 0 0 10px rgba(79,216,255,.35); }
+  button.primary { border-color: var(--cyan); color: var(--cyan-bright); }
+  button:focus-visible { outline: 2px solid var(--cyan-bright); outline-offset: 2px; }
+  .controls.hidden button { display: none; }
+
+  /* Smal skjerm: reaktoren øverst, panelene under. */
+  @media (max-width: 1100px) {
+    body { overflow: auto; }
+    .app { height: auto; min-height: 100%; grid-template-columns: 1fr; padding: 14px 16px; }
+    .core { height: min(78vw, 460px); order: -1; grid-row: 2; }
+    .panel.system { grid-row: 3; }
+    .panel.convo { grid-row: 4; max-height: 60vh; }
+    footer { grid-row: 5; grid-template-columns: 1fr; }
+    .controls { justify-content: flex-start; }
+    .brand span { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .msg { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <h1>E.D.D.I.E</h1>
+      <span>Personlig assistent · Mikael</span>
+    </div>
+    <div class="clock"><div class="time" id="time">--:--:--</div><div class="date" id="date"></div></div>
+  </header>
+
+  <section class="panel system" aria-label="Systemstatus">
+    <h2>SYSTEM <small id="uptime">00:00</small></h2>
+    <ul class="status" id="status"></ul>
+    <div class="metric">
+      <div class="row"><span class="lbl">Ventetid</span><span class="lbl">mål 1,5 s</span></div>
+      <div class="big" id="latency">–</div>
+      <div class="split" id="latency-split">Ingen svar ennå</div>
+      <canvas id="spark" aria-hidden="true"></canvas>
+    </div>
+  </section>
+
+  <section class="core" aria-label="Eddie">
+    <canvas id="hud" aria-hidden="true"></canvas>
+    <div class="core-label"><div class="name">EDDIE</div><div class="state" id="state-label" role="status">STANDBY</div></div>
+    <button class="talk" id="talk" hidden>Snakk</button>
+  </section>
+
+  <section class="panel convo" aria-label="Samtale">
+    <h2>SAMTALE <small id="count">0</small></h2>
+    <div class="log" id="log"><p class="empty" id="empty">Ingen samtale ennå. Hold høyre Ctrl og snakk, eller trykk «Kjør demo».</p></div>
+  </section>
+
+  <footer>
+    <div class="subtitle"><div class="line" id="subtitle"></div><div class="hint" id="hint">Hold høyre Ctrl for å snakke</div></div>
+    <div class="controls" id="controls">
+      <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-text">Kobler til …</span></span>
+      <button data-state="idle" title="1">Standby</button>
+      <button data-state="listening" title="2">Lytter</button>
+      <button data-state="thinking" title="3">Tenker</button>
+      <button data-state="searching" title="4">Søker</button>
+      <button data-state="speaking" title="5">Snakker</button>
+      <button class="primary" id="demo" title="D">Kjør demo</button>
+    </div>
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- Tilstander ---------- */
+const STATES = {
+  idle:      { label: "STANDBY", color: [79, 216, 255], speed: 0.35, glow: 0.35, hint: "Hold høyre Ctrl for å snakke" },
+  listening: { label: "LYTTER",  color: [120, 230, 255], speed: 0.8,  glow: 0.8,  hint: "Snakk – Eddie lytter" },
+  thinking:  { label: "TENKER",  color: [255, 181, 71],  speed: 2.2,  glow: 0.7,  hint: "Eddie tenker …" },
+  searching: { label: "SØKER",   color: [255, 181, 71],  speed: 1.4,  glow: 0.7,  hint: "Eddie slår opp på nettet …" },
+  speaking:  { label: "SNAKKER", color: [180, 242, 255], speed: 1.0,  glow: 1.0,  hint: "Snakk for å avbryte" },
+  error:     { label: "FEIL",    color: [255, 77, 94],   speed: 0.5,  glow: 0.8,  hint: "Noe gikk galt – se loggen" },
+};
+
+const ui = {
+  hud: document.getElementById("hud"),
+  stateLabel: document.getElementById("state-label"),
+  subtitle: document.getElementById("subtitle"),
+  hint: document.getElementById("hint"),
+  log: document.getElementById("log"),
+  empty: document.getElementById("empty"),
+  count: document.getElementById("count"),
+  status: document.getElementById("status"),
+  latency: document.getElementById("latency"),
+  latencySplit: document.getElementById("latency-split"),
+  spark: document.getElementById("spark"),
+  connDot: document.getElementById("conn-dot"),
+  connText: document.getElementById("conn-text"),
+};
+
+const S = {
+  state: "idle", level: 0, levelTarget: 0, t: 0, speed: 0.35, glow: 0.35,
+  color: [...STATES.idle.color], rot: [0, 0, 0, 0], latencies: [], messages: 0,
+  live: null, // Eddie-melding som skrives nå
+};
+
+/* ---------- Offentlig API (brukes av WebSocket og demo) ---------- */
+const Eddie = {
+  setState(name) {
+    if (!STATES[name]) return;
+    S.state = name;
+    const st = STATES[name];
+    ui.stateLabel.textContent = st.label;
+    ui.stateLabel.style.setProperty("--state-color", `rgb(${st.color.join(",")})`);
+    ui.hint.textContent = st.hint;
+    if (name !== "speaking" && name !== "listening") S.levelTarget = 0;
+  },
+  setLevel(v) { S.levelTarget = Math.max(0, Math.min(1, v)); },
+  userSaid(text) {
+    Eddie.finishEddie();
+    addMessage("user", "MIKAEL", text);
+    ui.subtitle.textContent = "«" + text + "»";
+  },
+  eddieSays(chunk, final = false) {
+    if (!S.live) S.live = addMessage("eddie", "EDDIE", "");
+    const txt = S.live.querySelector(".txt");
+    txt.textContent += chunk;
+    ui.subtitle.textContent = lastSentence(txt.textContent);
+    scrollLog();
+    if (final) Eddie.finishEddie();
+  },
+  finishEddie() {
+    if (S.live) { S.live.classList.remove("live"); S.live = null; }
+  },
+  setStatus(key, value, ok = true) {
+    let li = ui.status.querySelector(`[data-key="${key}"]`);
+    if (!li) {
+      li = document.createElement("li");
+      li.dataset.key = key;
+      li.innerHTML = `<span class="dot"></span><div><div class="k"></div><div class="v"></div></div>`;
+      ui.status.appendChild(li);
+    }
+    li.querySelector(".k").textContent = STATUS_LABELS[key] || key;
+    li.querySelector(".v").textContent = value;
+    li.querySelector(".dot").className = "dot " + (ok === true ? "ok" : ok === false ? "err" : "warn");
+  },
+  latency(seconds, stt, brain) {
+    S.latencies.push(seconds);
+    if (S.latencies.length > 16) S.latencies.shift();
+    ui.latency.textContent = seconds.toFixed(2).replace(".", ",") + " s";
+    ui.latency.classList.toggle("slow", seconds > 1.5);
+    const parts = [];
+    if (stt != null) parts.push(`tale→tekst ${stt.toFixed(2)}`);
+    if (brain != null) parts.push(`hjerne ${brain.toFixed(2)}`);
+    ui.latencySplit.textContent = parts.join(" · ").replace(/\./g, ",") || "fra du sluttet å snakke";
+    drawSpark();
+  },
+};
+window.Eddie = Eddie;
+
+const STATUS_LABELS = {
+  brain: "Hjerne", stt: "Tale → tekst", tts: "Stemme", mic: "Mikrofon", link: "Tilkobling", web: "Nettsøk",
+};
+
+function addMessage(cls, who, text) {
+  ui.empty?.remove();
+  const el = document.createElement("div");
+  el.className = `msg ${cls}` + (cls === "eddie" ? " live" : "");
+  const time = new Date().toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" });
+  el.innerHTML = `<div class="who"><span></span><span></span></div><div class="txt"></div>`;
+  el.querySelector(".who span").textContent = who;
+  el.querySelectorAll(".who span")[1].textContent = time;
+  el.querySelector(".txt").textContent = text;
+  ui.log.appendChild(el);
+  ui.count.textContent = ++S.messages;
+  scrollLog();
+  return el;
+}
+function scrollLog() { ui.log.scrollTop = ui.log.scrollHeight; }
+function lastSentence(text) {
+  const parts = text.trim().split(/(?<=[.!?])\s+/);
+  return parts[parts.length - 1] || "";
+}
+
+/* ---------- Klokke ---------- */
+const started = Date.now();
+function tickClock() {
+  const now = new Date();
+  document.getElementById("time").textContent = now.toLocaleTimeString("no-NO");
+  document.getElementById("date").textContent = now.toLocaleDateString("no-NO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const up = Math.floor((Date.now() - started) / 1000);
+  document.getElementById("uptime").textContent =
+    `${String(Math.floor(up / 60)).padStart(2, "0")}:${String(up % 60).padStart(2, "0")}`;
+}
+setInterval(tickClock, 1000); tickClock();
+
+/* ---------- Reaktoren (canvas) ---------- */
+const ctx = ui.hud.getContext("2d");
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  const r = ui.hud.getBoundingClientRect();
+  W = r.width; H = r.height;
+  ui.hud.width = Math.round(W * DPR); ui.hud.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  drawSpark();
+}
+new ResizeObserver(resize).observe(ui.hud);
+
+const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+const lerp = (a, b, k) => a + (b - a) * k;
+
+function ring(r, width, alpha, dash) {
+  ctx.beginPath();
+  ctx.setLineDash(dash || []);
+  ctx.lineWidth = width;
+  ctx.strokeStyle = rgba(S.color, alpha);
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+function arc(r, from, to, width, alpha) {
+  ctx.beginPath();
+  ctx.lineWidth = width;
+  ctx.strokeStyle = rgba(S.color, alpha);
+  ctx.arc(0, 0, r, from, to);
+  ctx.stroke();
+}
+
+function draw(dt) {
+  const st = STATES[S.state];
+  const k = Math.min(1, dt * 4);
+  for (let i = 0; i < 3; i++) S.color[i] = lerp(S.color[i], st.color[i], k);
+  S.speed = lerp(S.speed, reduced ? st.speed * 0.25 : st.speed, k);
+  S.glow = lerp(S.glow, st.glow, k);
+  S.level = lerp(S.level, S.levelTarget, Math.min(1, dt * 14));
+  S.t += dt;
+  const sp = S.speed;
+  S.rot[0] += dt * 0.08 * sp;
+  S.rot[1] -= dt * 0.22 * sp;
+  S.rot[2] += dt * 0.5 * sp;
+  S.rot[3] -= dt * 1.6 * sp;
+
+  ctx.clearRect(0, 0, W, H);
+  const R = Math.min(W, H) * 0.44;
+  if (R <= 0) return;
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.lineCap = "round";
+  ctx.shadowColor = rgba(S.color, 0.9);
+  ctx.shadowBlur = 8 + 14 * S.glow;
+
+  // 1. Ytterring med skalastreker
+  ctx.save(); ctx.rotate(S.rot[0]);
+  ring(R, 1, 0.35);
+  for (let i = 0; i < 180; i++) {
+    const a = (i / 180) * Math.PI * 2, long = i % 15 === 0, mid = i % 5 === 0;
+    const len = long ? 14 : mid ? 8 : 4;
+    ctx.beginPath();
+    ctx.lineWidth = long ? 2 : 1;
+    ctx.strokeStyle = rgba(S.color, long ? 0.9 : 0.4);
+    ctx.moveTo(Math.cos(a) * R, Math.sin(a) * R);
+    ctx.lineTo(Math.cos(a) * (R - len), Math.sin(a) * (R - len));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Små satellitter utenfor ringen
+  for (let i = 0; i < 3; i++) {
+    const a = S.rot[1] * 0.7 + i * 2.094;
+    ctx.beginPath(); ctx.fillStyle = rgba(S.color, 0.9);
+    ctx.arc(Math.cos(a) * (R + 10), Math.sin(a) * (R + 10), 2.2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 2. Segmentert bue-ring
+  ctx.save(); ctx.rotate(S.rot[1]);
+  const segs = [[0, 0.95], [1.15, 1.75], [2.0, 3.3], [3.55, 4.1], [4.4, 5.9]];
+  for (const [a, b] of segs) arc(R * 0.9, a, b, 3, 0.75);
+  ctx.restore();
+
+  // 3. Radial equalizer som reagerer på lydnivå
+  const bars = 120, rIn = R * 0.74;
+  for (let i = 0; i < bars; i++) {
+    const a = (i / bars) * Math.PI * 2 + S.rot[0] * 0.5;
+    const n = 0.5 + 0.5 * Math.sin(S.t * 6 + i * 0.7) * Math.sin(S.t * 2.3 + i * 0.13);
+    const idle = 0.05 + 0.04 * Math.sin(S.t * 1.2 + i * 0.3);
+    const len = R * (0.02 + 0.13 * Math.max(idle, S.level * (0.35 + 0.65 * n)));
+    ctx.beginPath();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = rgba(S.color, 0.35 + 0.55 * S.level);
+    ctx.moveTo(Math.cos(a) * rIn, Math.sin(a) * rIn);
+    ctx.lineTo(Math.cos(a) * (rIn + len), Math.sin(a) * (rIn + len));
+    ctx.stroke();
+  }
+
+  // 4. Stiplet ring + komet når han tenker
+  ctx.save(); ctx.rotate(S.rot[2]);
+  ring(R * 0.64, 1.5, 0.5, [2, 8]);
+  ctx.restore();
+  if (S.state === "thinking" || S.state === "searching") {
+    const head = S.rot[3];
+    for (let i = 0; i < 24; i++) {
+      arc(R * 0.64, head - i * 0.06, head - i * 0.06 + 0.07, 4, (1 - i / 24) * 0.95);
+    }
+  }
+
+  // Radarsveip når han søker
+  if (S.state === "searching") {
+    const a = S.t * 2.4;
+    const g = ctx.createConicGradient ? ctx.createConicGradient(a - 0.9, 0, 0) : null;
+    if (g) {
+      g.addColorStop(0, rgba(S.color, 0)); g.addColorStop(0.14, rgba(S.color, 0.28)); g.addColorStop(0.145, rgba(S.color, 0));
+      ctx.beginPath(); ctx.fillStyle = g; ctx.moveTo(0, 0); ctx.arc(0, 0, R * 0.86, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // 5. Indre ring med markører
+  ctx.save(); ctx.rotate(-S.rot[0] * 2);
+  ring(R * 0.52, 1, 0.45);
+  for (let i = 0; i < 4; i++) {
+    ctx.save(); ctx.rotate(i * Math.PI / 2);
+    ctx.beginPath(); ctx.fillStyle = rgba(S.color, 0.9);
+    ctx.moveTo(R * 0.52 - 7, 0); ctx.lineTo(R * 0.52 + 3, -5); ctx.lineTo(R * 0.52 + 3, 5); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // 6. Kjernen
+  const pulse = 1 + 0.05 * Math.sin(S.t * 2) + 0.18 * S.level;
+  const rc = R * 0.36 * pulse;
+  const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, rc);
+  grd.addColorStop(0, rgba([255, 255, 255], 0.22 + 0.25 * S.glow));
+  grd.addColorStop(0.35, rgba(S.color, 0.18 + 0.2 * S.glow));
+  grd.addColorStop(1, rgba(S.color, 0));
+  ctx.shadowBlur = 0;
+  ctx.beginPath(); ctx.fillStyle = grd; ctx.arc(0, 0, rc, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 8 + 14 * S.glow;
+  ring(R * 0.36, 2, 0.85);
+  ring(R * 0.33, 1, 0.3);
+
+  // Bølgeform over kjernen når han snakker
+  if (S.state === "speaking" || S.level > 0.02) {
+    ctx.beginPath();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = rgba(S.color, 0.85);
+    const w = R * 0.56;
+    for (let x = -w / 2; x <= w / 2; x += 2) {
+      const env = Math.cos((x / w) * Math.PI); // smalner av mot kantene
+      const y = env * S.level * R * 0.09 *
+        (Math.sin(x * 0.09 + S.t * 9) + 0.6 * Math.sin(x * 0.21 - S.t * 13) + 0.3 * Math.sin(x * 0.5 + S.t * 5));
+      x === -w / 2 ? ctx.moveTo(x, y + R * 0.2) : ctx.lineTo(x, y + R * 0.2);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  draw(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- Ventetidsgraf ---------- */
+function drawSpark() {
+  const c = ui.spark, g = c.getContext("2d");
+  const r = c.getBoundingClientRect();
+  c.width = Math.round(r.width * DPR); c.height = Math.round(r.height * DPR);
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.clearRect(0, 0, r.width, r.height);
+  const max = Math.max(3, ...S.latencies), h = r.height, w = r.width;
+  const y = v => h - 4 - (v / max) * (h - 8);
+  // Mållinje 1,5 s
+  g.strokeStyle = "rgba(255,181,71,.45)"; g.setLineDash([3, 4]); g.beginPath();
+  g.moveTo(0, y(1.5)); g.lineTo(w, y(1.5)); g.stroke(); g.setLineDash([]);
+  if (S.latencies.length < 2) return;
+  g.strokeStyle = "#4fd8ff"; g.lineWidth = 2; g.shadowColor = "#4fd8ff"; g.shadowBlur = 6; g.beginPath();
+  S.latencies.forEach((v, i) => {
+    const x = (i / (S.latencies.length - 1)) * w;
+    i ? g.lineTo(x, y(v)) : g.moveTo(x, y(v));
+  });
+  g.stroke();
+}
+
+/* ---------- Startstatus ---------- */
+Eddie.setStatus("brain", "Claude Haiku 5.5", null);
+Eddie.setStatus("stt", "NB-Whisper small · GPU", null);
+Eddie.setStatus("tts", "ElevenLabs · Eric", null);
+Eddie.setStatus("mic", "Venter på Eddie", null);
+Eddie.setStatus("link", "Kobler til …", null);
+Eddie.setState("idle");
+
+/* ---------- Tilkobling til den lokale Eddie ---------- */
+const params = new URLSearchParams(location.search);
+// Servert av Eddie selv (http://localhost:8765): samme adresse. Ellers (fil, GitHub Pages): Eddie på denne PC-en.
+const servedByEddie = location.protocol === "http:" && ["localhost", "127.0.0.1"].includes(location.hostname);
+const WS_URL = params.get("ws") || (servedByEddie ? `ws://${location.host}/ws` : "ws://localhost:8765/ws");
+let ws = null, connected = false;
+const controls = document.getElementById("controls");
+
+function setConnection(ok) {
+  connected = ok;
+  ui.connDot.className = "dot " + (ok ? "ok" : "warn");
+  ui.connText.textContent = ok ? "Tilkoblet Eddie" : "Demomodus";
+  Eddie.setStatus("link", ok ? "Tilkoblet " + WS_URL.replace(/^wss?:\/\//, "").replace(/\/ws$/, "")
+                             : "Frakoblet – demomodus", ok ? true : null);
+}
+
+function connect() {
+  try { ws = new WebSocket(WS_URL); } catch { setConnection(false); return setTimeout(connect, 3000); }
+  ws.onopen = () => {
+    stopDemo();
+    setConnection(true);
+    controls.classList.add("hidden"); // demoknappene gir ikke mening når den ekte Eddie styrer
+    talkBtn.hidden = false;
+    coreEl.classList.add("clickable");
+    setConversation(false);
+  };
+  ws.onclose = () => {
+    if (connected) Eddie.setState("idle");
+    controls.classList.remove("hidden");
+    talkBtn.hidden = true;
+    coreEl.classList.remove("clickable");
+    setConnection(false);
+    setTimeout(connect, 3000);
+  };
+  ws.onerror = () => {};
+  ws.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    switch (m.type) {
+      case "state": Eddie.setState(m.state); break;
+      case "level": Eddie.setLevel(m.value); break;
+      case "user": Eddie.userSaid(m.text); break;
+      case "eddie": Eddie.eddieSays(m.text || "", !!m.final); break;
+      case "status": Eddie.setStatus(m.key, m.value, m.ok); break;
+      case "latency": Eddie.latency(m.seconds, m.stt, m.brain); break;
+      case "conversation": setConversation(!!m.active); break;
+    }
+  };
+}
+
+/* ---------- Snakk / Avslutt fra portalen ---------- */
+const talkBtn = document.getElementById("talk");
+const coreEl = document.querySelector(".core");
+let conversation = false;
+
+function setConversation(active) {
+  conversation = active;
+  talkBtn.textContent = active ? "Avslutt" : "Snakk";
+  talkBtn.classList.toggle("active", active);
+  talkBtn.setAttribute("aria-pressed", String(active));
+  if (!active && connected) ui.hint.textContent = "Klikk «Snakk» eller hold høyre Ctrl";
+}
+function toggleTalk() {
+  if (!connected || !ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "command", action: conversation ? "stop" : "talk" }));
+}
+talkBtn.addEventListener("click", toggleTalk);
+ui.hud.addEventListener("click", e => {
+  // Bare et klikk på selve kjernen, ikke hvor som helst i ringene.
+  const r = ui.hud.getBoundingClientRect();
+  const d = Math.hypot(e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2);
+  if (d < Math.min(r.width, r.height) * 0.44 * 0.4) toggleTalk();
+});
+setConnection(false);
+connect();
+
+/* ---------- Demomodus ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let demoRun = 0, levelTimer = null;
+
+function fakeLevel(base, wobble) {
+  clearInterval(levelTimer);
+  levelTimer = setInterval(() => Eddie.setLevel(base + Math.random() * wobble), 90);
+}
+function stopLevel() { clearInterval(levelTimer); levelTimer = null; Eddie.setLevel(0); }
+function stopDemo() { demoRun++; stopLevel(); document.getElementById("demo").textContent = "Kjør demo"; }
+
+async function speak(run, text) {
+  Eddie.setState("speaking");
+  fakeLevel(0.35, 0.6);
+  for (const word of text.split(" ")) {
+    if (run !== demoRun) return false;
+    Eddie.eddieSays(word + " ");
+    await sleep(170 + Math.random() * 120);
+  }
+  Eddie.eddieSays("", true);
+  stopLevel();
+  return true;
+}
+async function listen(run, text) {
+  Eddie.setState("listening");
+  fakeLevel(0.15, 0.5);
+  await sleep(1400 + text.length * 25);
+  if (run !== demoRun) return false;
+  stopLevel();
+  Eddie.userSaid(text);
+  return true;
+}
+
+const SCRIPT = [
+  { user: "Hei Eddie, jeg er litt sliten i dag.", think: 1100,
+    eddie: "Sorry to hear that. Long days wear you down, especially with a lot going on at once. Was it the work, or just a heavy week?" },
+  { user: "Har jobbet med en presentasjon om boligmarkedet hele dagen.", think: 900,
+    eddie: "That explains it. Presentations eat a day faster than anyone expects. Is it nearly done, or still in the part where nothing fits together?" },
+  { user: "Hvordan blir været i Oslo i morgen?", think: 600, search: 2600,
+    eddie: "Cool and damp. Two to nine degrees, fog in the morning and a bit of rain around midday. I'd bring a jacket." },
+];
+
+async function runDemo() {
+  const run = ++demoRun;
+  document.getElementById("demo").textContent = "Stopp demo";
+  for (const step of SCRIPT) {
+    if (!(await listen(run, step.user))) return;
+    const t0 = performance.now();
+    Eddie.setState("thinking");
+    await sleep(step.think);
+    if (step.search) {
+      if (!(await speak(run, "One moment, let me check."))) return;
+      Eddie.setState("searching");
+      await sleep(step.search);
+    }
+    if (run !== demoRun) return;
+    const brain = (performance.now() - t0) / 1000;
+    Eddie.latency(0.38 + 0.6 + Math.min(brain, 1.4), 0.38, Math.min(brain, 1.4));
+    if (!(await speak(run, step.eddie))) return;
+    Eddie.setState("listening");
+    await sleep(1200);
+  }
+  if (run === demoRun) { Eddie.setState("idle"); stopDemo(); }
+}
+
+document.getElementById("demo").addEventListener("click", () => {
+  if (connected) return;
+  if (levelTimer || document.getElementById("demo").textContent === "Stopp demo") { stopDemo(); Eddie.setState("idle"); }
+  else runDemo();
+});
+document.querySelectorAll("button[data-state]").forEach(b => b.addEventListener("click", () => {
+  stopDemo();
+  Eddie.setState(b.dataset.state);
+  if (b.dataset.state === "listening") fakeLevel(0.1, 0.5);
+  if (b.dataset.state === "speaking") fakeLevel(0.35, 0.6);
+}));
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input, textarea")) return;
+  const map = { "1": "idle", "2": "listening", "3": "thinking", "4": "searching", "5": "speaking" };
+  if (map[e.key]) document.querySelector(`button[data-state="${map[e.key]}"]`).click();
+  if (e.key.toLowerCase() === "d") document.getElementById("demo").click();
+});
+</script>
+</body>
+</html>
