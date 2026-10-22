@@ -25,8 +25,11 @@
                                                              hele kunnskapsgrafen (knowledge_graph.py); slås sammen
     {"type": "activity", "path": ["eddie", "connector:ssb", …], "tool": "mcp__ssb__boligpriser"}
                                                              hvor i hjernen Eddie leter akkurat nå
-  Kommandoer til Eddie (bare disse to):
+    {"type": "sources", "items": [{kind, title, url, query?}], "pending": true}
+                                                             kildene til svaret som pågår (sources.py); pending=false når svaret er ferdig
+  Kommandoer til Eddie:
     {"type": "command", "action": "talk" | "stop"}
+    {"type": "command", "action": "message", "text": "..."}  skrevet melding fra chatten (maks 2000 tegn)
 -->
 <style>
   :root {
@@ -108,6 +111,22 @@
   }
   .panel h2 small { letter-spacing: .12em; color: var(--text-dim); font-size: 11px; }
 
+  /* Venstre kolonne: kilder øverst, systemstatus under */
+  .side { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  .panel.sources { flex: 1 1 auto; min-height: 140px; }
+  .panel.system { flex: 0 0 auto; }
+  .src-list { list-style: none; margin: 0; padding: 0 6px 0 0; display: grid; gap: 10px; overflow-y: auto; min-height: 0;
+    scrollbar-width: thin; scrollbar-color: var(--line) transparent; align-content: start; }
+  .src-list li { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: baseline; animation: fadein .35s ease-out; }
+  .src-kind { font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase; padding: 2px 6px;
+    border: 1px solid var(--line); color: var(--state, var(--cyan)); white-space: nowrap; }
+  .src-list a, .src-list .t { color: var(--text); font-size: 15px; line-height: 1.25; text-decoration: none; overflow-wrap: anywhere; }
+  .src-list a:hover { color: #fff; text-decoration: underline; text-decoration-color: var(--state, var(--cyan)); }
+  .src-list a::after { content: " ↗"; color: var(--text-dim); font-size: 12px; }
+  .src-list .q { grid-column: 2; font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); letter-spacing: .06em; }
+  .src-note { margin: 0; color: var(--text-dim); font-size: 14px; letter-spacing: .03em; }
+  .src-note.pending::after { content: " …"; animation: blink 1s steps(2) infinite; }
+
   /* Systempanel */
   .status { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
   .status li { display: grid; grid-template-columns: 10px 1fr; gap: 10px; align-items: start; }
@@ -118,13 +137,13 @@
   .status .k { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
   .status .v { font-size: 16px; font-weight: 500; color: var(--text); }
 
-  .metric { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .metric { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
   .metric .row { display: flex; justify-content: space-between; align-items: baseline; }
   .metric .big { font-family: var(--big); font-size: 38px; letter-spacing: .04em; color: #f3e8ff; }
   .metric .big.slow { color: var(--amber); }
   .metric .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
   .metric .split { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
-  #spark { width: 100%; height: 54px; margin-top: 8px; display: block; }
+  #spark { width: 100%; height: 40px; margin-top: 8px; display: block; }
 
   /* Midten: hjernen */
   .core { position: relative; min-height: 0; min-width: 0; }
@@ -134,8 +153,9 @@
   .strip {
     position: absolute; left: 50%; top: 2px; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
     font-family: var(--mono); font-size: 10.5px; letter-spacing: .22em; color: var(--text-dim); text-transform: uppercase;
-    display: flex; gap: 26px;
+    display: flex; gap: 20px;
   }
+  @media (max-width: 1500px) { .strip .opt { display: none; } }
   .strip b { font-weight: 500; color: var(--state, var(--cyan)); transition: color .6s; }
   .strip .live::before { content: "● "; color: var(--state, var(--cyan)); }
   .card {
@@ -151,13 +171,27 @@
   #card-search { left: 3%; top: 9%; }
   #card-learned { right: 3%; top: 9%; }
   #card-source { right: 3%; bottom: 30%; }
-  .readout { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); text-align: center; pointer-events: none; width: 92%; }
-  .readout .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .3em; color: var(--state, var(--cyan)); text-transform: uppercase; transition: color .6s; }
-  .readout .num { font-family: var(--big); font-size: clamp(48px, 7vw, 86px); line-height: .95; color: #f3e8ff; letter-spacing: .02em; text-shadow: 0 0 24px rgba(240, 171, 252, .25); }
-  .readout .num small { font-family: var(--mono); font-size: 12px; letter-spacing: .3em; color: var(--text-dim); margin-left: 10px; }
-  .readout .bar { width: 260px; max-width: 70%; height: 2px; margin: 6px auto 8px; background: var(--line); position: relative; overflow: hidden; }
-  .readout .bar i { position: absolute; inset: 0; width: var(--fill, 30%); background: var(--state, var(--cyan)); box-shadow: 0 0 8px var(--state, var(--cyan)); transition: width .8s, background .6s; }
-  .readout .sub { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; color: var(--text-dim); text-transform: uppercase; }
+  /* Stemmeknappen: midt under hjernen. Ringene vokser med lydnivået mens Eddie lytter (og snakker). */
+  .voice { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); text-align: center; width: 92%;
+    pointer-events: none; display: flex; flex-direction: column; align-items: center; }
+  .mic {
+    --lvl: 0; position: relative; width: 84px; height: 84px; padding: 0; border-radius: 50%; pointer-events: auto;
+    display: grid; place-items: center; color: #f3e8ff; background: rgba(14, 8, 22, .85);
+    border: 2px solid var(--state, var(--cyan)); box-shadow: 0 0 18px rgba(240, 171, 252, .18); transition: border-color .6s, box-shadow .3s;
+  }
+  .mic svg { width: 32px; height: 32px; }
+  .mic::before, .mic::after {
+    content: ""; position: absolute; inset: -8px; border-radius: 50%; pointer-events: none;
+    border: 2px solid var(--state, var(--cyan)); opacity: calc(.15 + var(--lvl) * .8);
+    transform: scale(calc(1 + var(--lvl) * .55)); transition: border-color .6s;
+  }
+  .mic::after { inset: -18px; border-width: 1px; opacity: calc(var(--lvl) * .6); transform: scale(calc(1 + var(--lvl) * .9)); }
+  .mic:hover { background: rgba(30, 16, 44, .9); box-shadow: 0 0 26px rgba(240, 171, 252, .35); }
+  .mic.active { box-shadow: 0 0 30px var(--state, var(--cyan)); }
+  .mic.active::before { animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { inset: -12px; } }
+  .voice .lbl { margin-top: 16px; font-family: var(--mono); font-size: 11px; letter-spacing: .3em; color: var(--state, var(--cyan)); text-transform: uppercase; transition: color .6s; }
+  .voice .sub { margin-top: 4px; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--text-dim); text-transform: uppercase; }
   .tooltip {
     position: absolute; pointer-events: none; max-width: 260px; padding: 8px 10px; z-index: 3;
     background: rgba(14, 8, 22, .94); border: 1px solid var(--line);
@@ -166,13 +200,6 @@
   .tooltip.show { opacity: 1; }
   .tooltip b { display: block; font-weight: 600; color: #fff; }
   .tooltip small { display: block; margin-top: 3px; font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); letter-spacing: .08em; }
-  .talk {
-    position: absolute; right: 3%; bottom: 4%;
-    font-size: 12px; letter-spacing: .35em; padding: 10px 20px 10px calc(20px + .35em);
-    border-color: var(--state, var(--cyan)); color: #f3e8ff; background: rgba(240, 171, 252, .06);
-  }
-  .talk.active { border-color: var(--amber); color: var(--amber); background: rgba(255,181,71,.08); }
-  .talk.active:hover { background: rgba(255,181,71,.18); color: #ffd79a; }
 
   /* Samtalepanel */
   .log { overflow-y: auto; flex: 1; min-height: 0; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
@@ -184,6 +211,14 @@
   .msg.eddie .txt { color: #e9d5ff; }
   .msg.eddie.live .txt::after { content: "▍"; color: var(--state, var(--cyan)); animation: blink 1s steps(2) infinite; }
   .empty { color: var(--text-dim); font-size: 15px; letter-spacing: .05em; }
+  .chat { display: flex; gap: 8px; margin: 12px 0 0; border-top: 1px solid var(--line); padding-top: 12px; }
+  .chat input {
+    flex: 1; min-width: 0; font: 500 16px var(--body); color: var(--text); background: rgba(5, 3, 10, .6);
+    border: 1px solid var(--line); padding: 9px 12px; outline: none; transition: border-color .2s;
+  }
+  .chat input:focus { border-color: var(--state, var(--cyan)); }
+  .chat input::placeholder { color: var(--text-dim); }
+  .chat input:disabled, .chat button:disabled { opacity: .5; cursor: not-allowed; }
   @keyframes fadein { from { opacity: 0; transform: translateY(4px); } }
   @keyframes blink { 50% { opacity: 0; } }
 
@@ -212,14 +247,13 @@
     body { overflow: auto; }
     .app { height: auto; min-height: 100%; grid-template-columns: 1fr; padding: 14px 16px; }
     .core { height: min(115vw, 620px); order: -1; grid-row: 2; }
-    .panel.system { grid-row: 3; }
-    .panel.convo { grid-row: 4; max-height: 60vh; }
+    .side { grid-row: 4; }
+    .panel.convo { grid-row: 3; max-height: 60vh; }
     footer { grid-row: 5; grid-template-columns: 1fr; }
     .controls { justify-content: flex-start; }
     .brand span, .strip span:nth-child(n+3), #card-source { display: none; }
     .card { min-width: 0; max-width: 46%; }
-    .talk { right: 50%; transform: translateX(50%); bottom: 1%; }
-    .readout { bottom: 9%; }
+    .voice { bottom: 2%; }
   }
   @media (prefers-reduced-motion: reduce) {
     .msg { animation: none; }
@@ -236,6 +270,13 @@
     <div class="clock"><div class="time" id="time">--:--:--</div><div class="date" id="date"></div></div>
   </header>
 
+  <div class="side">
+  <section class="panel sources" aria-label="Kildene Eddie bruker">
+    <h2>KILDER <small id="src-count">0</small></h2>
+    <ul class="src-list" id="sources"></ul>
+    <p class="src-note" id="src-note">Kildene Eddie bruker vises her når han svarer.</p>
+  </section>
+
   <section class="panel system" aria-label="Systemstatus">
     <h2>SYSTEM <small id="uptime">00:00</small></h2>
     <ul class="status" id="status"></ul>
@@ -246,6 +287,7 @@
       <canvas id="spark" aria-hidden="true"></canvas>
     </div>
   </section>
+  </div>
 
   <section class="core" aria-label="Eddies hjerne: det han er koblet til og vet om">
     <canvas id="hud" aria-hidden="true"></canvas>
@@ -253,24 +295,30 @@
       <span class="live">Hjerne · <b id="strip-state">standby</b></span>
       <span>Link · <b id="strip-link">demo</b></span>
       <span>Connectors · <b id="strip-conn">0</b></span>
-      <span>Partikler · <b id="strip-particles">0</b></span>
+      <span>Noder · <b id="brain-count">0</b></span>
+      <span class="opt">Partikler · <b id="strip-particles">0</b></span>
     </div>
     <div class="card" id="card-search"><div class="t">Leter i</div><div class="s"></div></div>
     <div class="card" id="card-learned"><div class="t">Sist lært</div><div class="s"></div></div>
     <div class="card" id="card-source"><div class="t">Kilde</div><div class="s"></div></div>
-    <div class="readout">
-      <div class="lbl" id="state-label" role="status">Standby</div>
-      <div class="num"><span id="brain-count">0</span><small>noder</small></div>
-      <div class="bar"><i id="brain-bar"></i></div>
-      <div class="sub" id="brain-sub"></div>
-    </div>
     <div class="tooltip" id="tooltip" role="tooltip"></div>
-    <button class="talk" id="talk" hidden>Snakk</button>
+    <div class="voice">
+      <button class="mic" id="talk" aria-pressed="false" aria-label="Start samtale">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+      </button>
+      <div class="lbl" id="state-label" role="status">Standby</div>
+      <div class="sub" id="brain-sub">Klikk for demo</div>
+    </div>
   </section>
 
   <section class="panel convo" aria-label="Samtale">
     <h2>SAMTALE <small id="count">0</small></h2>
-    <div class="log" id="log"><p class="empty" id="empty">Ingen samtale ennå. Trykk kort på høyre Ctrl og snakk, eller trykk «Kjør demo».</p></div>
+    <div class="log" id="log"><p class="empty" id="empty">Ingen samtale ennå. Klikk mikrofonen, trykk kort på høyre Ctrl og snakk, eller skriv under.</p></div>
+    <form class="chat" id="chat" autocomplete="off">
+      <input id="chat-input" maxlength="2000" placeholder="Koble til Eddie for å skrive" aria-label="Skriv til Eddie" disabled>
+      <button class="primary" id="chat-send" type="submit" disabled>Send</button>
+    </form>
   </section>
 
   <footer>
@@ -332,8 +380,10 @@ const ui = {
   stripConn: document.getElementById("strip-conn"),
   stripParticles: document.getElementById("strip-particles"),
   brainCount: document.getElementById("brain-count"),
-  brainBar: document.getElementById("brain-bar"),
   brainSub: document.getElementById("brain-sub"),
+  sources: document.getElementById("sources"),
+  srcNote: document.getElementById("src-note"),
+  srcCount: document.getElementById("src-count"),
 };
 
 const S = {
@@ -397,6 +447,13 @@ const Eddie = {
     drawSpark();
   },
   graph(snapshot, replace = false) { mergeGraph(snapshot, replace); },
+  sources(items, pending) {
+    ui.sources.replaceChildren(...items.map(sourceItem));
+    ui.srcCount.textContent = items.length;
+    ui.srcNote.hidden = items.length > 0;
+    ui.srcNote.classList.toggle("pending", pending && !items.length);
+    ui.srcNote.textContent = pending ? "Eddie svarer" : "Ingen kilder – Eddie svarte fra egen kunnskap.";
+  },
   activity(path) {
     const known = path.filter(id => G.nodes.has(id));
     if (!known.length) return;
@@ -412,6 +469,27 @@ window.Eddie = Eddie;
 const STATUS_LABELS = {
   brain: "Hjerne", stt: "Tale → tekst", tts: "Stemme", mic: "Mikrofon", link: "Tilkobling", web: "Nettsøk",
 };
+
+function sourceItem(src) {
+  const li = document.createElement("li");
+  const kind = document.createElement("span");
+  kind.className = "src-kind";
+  kind.textContent = src.kind || "Kilde";
+  // Bare vanlige nettadresser blir lenker; alt annet (minner, rare verdier) vises som tekst.
+  const safe = /^https?:\/\//i.test(src.url || "");
+  const title = document.createElement(safe ? "a" : "span");
+  title.className = "t";
+  title.textContent = src.title || src.url || "";
+  if (safe) { title.href = src.url; title.target = "_blank"; title.rel = "noopener noreferrer"; title.title = src.url; }
+  li.append(kind, title);
+  if (src.query) {
+    const q = document.createElement("span");
+    q.className = "q";
+    q.textContent = "søk: " + src.query;
+    li.append(q);
+  }
+  return li;
+}
 
 function addMessage(cls, who, text) {
   ui.empty?.remove();
@@ -481,11 +559,7 @@ function updateReadout() {
   const counts = {};
   for (const n of G.nodes.values()) counts[n.type] = (counts[n.type] || 0) + 1;
   ui.brainCount.textContent = G.nodes.size;
-  ui.brainSub.textContent = ["connector", "tool", "knowledge", "memory", "content"]
-    .filter(t => counts[t]).map(t => `${counts[t]} ${counts[t] === 1 ? TYPES[t].one : TYPES[t].plural}`).join(" · ");
   ui.stripConn.textContent = counts.connector || 0;
-  // Baren fyller seg mot 100 noder: en grov følelse av hvor «stor» hjernen er blitt.
-  ui.brainBar.style.setProperty("--fill", Math.min(100, G.nodes.size) + "%");
 }
 
 /* ---------- Hjernen i 3D ---------- */
@@ -795,6 +869,7 @@ function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   draw(dt);
+  talkBtn.style.setProperty("--lvl", S.level.toFixed(3));
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
@@ -921,14 +996,15 @@ function connect() {
     setConnection(true);
     realGraph = false; // den ekte grafen erstatter demohjernen når den kommer
     controls.classList.add("hidden"); // demoknappene gir ikke mening når den ekte Eddie styrer
-    talkBtn.hidden = false;
     setConversation(false);
+    setChat(true);
   };
   ws.onclose = () => {
     if (connected) Eddie.setState("idle");
     controls.classList.remove("hidden");
-    talkBtn.hidden = true;
+    setChat(false);
     setConnection(false);
+    setConversation(false);
     setTimeout(connect, 3000);
   };
   ws.onerror = () => {};
@@ -944,28 +1020,48 @@ function connect() {
       case "conversation": setConversation(!!m.active); break;
       case "graph": Eddie.graph(m, !realGraph); realGraph = true; break;
       case "activity": Eddie.activity(m.path || []); break;
+      case "sources": Eddie.sources(Array.isArray(m.items) ? m.items : [], !!m.pending); break;
     }
   };
 }
 
-/* ---------- Snakk / Avslutt fra portalen ---------- */
+/* ---------- Stemmeknappen og chatten ---------- */
 const talkBtn = document.getElementById("talk");
+const chatForm = document.getElementById("chat");
+const chatInput = document.getElementById("chat-input");
+const chatSend = document.getElementById("chat-send");
 let conversation = false;
 
 function setConversation(active) {
   conversation = active;
-  talkBtn.textContent = active ? "Avslutt" : "Snakk";
   talkBtn.classList.toggle("active", active);
   talkBtn.setAttribute("aria-pressed", String(active));
+  talkBtn.setAttribute("aria-label", active ? "Avslutt samtalen" : "Start samtale");
+  ui.brainSub.textContent = !connected ? "Klikk for demo" : active ? "Klikk for å avslutte" : "Klikk for å snakke";
   if (connected) ui.hint.textContent = active
     ? "Kort trykk på høyre Ctrl avslutter · hold inne for å snakke"
-    : "Klikk «Snakk» eller trykk kort på høyre Ctrl";
+    : "Klikk mikrofonen, trykk kort på høyre Ctrl eller skriv til Eddie";
+}
+function sendCommand(msg) {
+  if (!connected || !ws || ws.readyState !== WebSocket.OPEN) return false;
+  ws.send(JSON.stringify({ type: "command", ...msg }));
+  return true;
 }
 function toggleTalk() {
-  if (!connected || !ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ type: "command", action: conversation ? "stop" : "talk" }));
+  if (!connected) return document.getElementById("demo").click();  // uten Eddie: mikrofonen spiller demoen
+  sendCommand({ action: conversation ? "stop" : "talk" });
+}
+function setChat(enabled) {
+  chatInput.disabled = chatSend.disabled = !enabled;
+  chatInput.placeholder = enabled ? "Skriv til Eddie …" : "Koble til Eddie for å skrive";
 }
 talkBtn.addEventListener("click", toggleTalk);
+chatForm.addEventListener("submit", e => {
+  e.preventDefault();
+  const text = chatInput.value.trim();
+  // Meldingen vises i samtalen når Eddie sender den tilbake («user»), så den bare står der én gang.
+  if (text && sendCommand({ action: "message", text })) chatInput.value = "";
+});
 setConnection(false);
 connect();
 
@@ -1008,11 +1104,13 @@ const SCRIPT = [
     eddie: "Sorry to hear that. Long days wear you down, especially with a lot going on at once. Was it the work, or just a heavy week?" },
   { user: "Hva koster kvadratmeteren i Oslo nå?", think: 700, search: 3200,
     path: ["eddie", "connector:ssb", "tool:ssb:boligpriser", "content:table:14310", "content:place:oslo"],
+    sources: [{ kind: "SSB", title: "Selveierboliger, pris per kvadratmeter (tabell 14310)", url: "https://www.ssb.no/statbank/table/14310" }],
     learn: [["content:table:14310", "Boligpriser (14310)", "tool:ssb:boligpriser", "SSB-tabell 14310"],
             ["content:place:oslo", "Oslo", "content:table:14310", "Sted"]],
     eddie: "About a hundred and two thousand kroner per square metre, says SSB for the third quarter. That's up about two percent on a year ago." },
   { user: "Hvordan blir været i Oslo i morgen?", think: 600, search: 2800,
     path: ["eddie", "connector:web", "tool:web:WebFetch", "content:site:yr.no"],
+    sources: [{ kind: "Nettside", title: "yr.no/nb/værvarsel/daglig-tabell/1-72837", url: "https://www.yr.no/nb/v%C3%A6rvarsel/daglig-tabell/1-72837/Norge/Oslo/Oslo/Oslo" }],
     learn: [["content:site:yr.no", "yr.no", "tool:web:WebFetch", "Nettsted yr.no"]],
     eddie: "Cool and damp. Two to nine degrees, fog in the morning and a bit of rain around midday. I'd bring a jacket." },
 ];
@@ -1022,6 +1120,7 @@ async function runDemo() {
   document.getElementById("demo").textContent = "Stopp demo";
   for (const step of SCRIPT) {
     if (!(await listen(run, step.user))) return;
+    Eddie.sources([], true);
     const t0 = performance.now();
     Eddie.setState("thinking");
     await sleep(step.think);
@@ -1033,12 +1132,14 @@ async function runDemo() {
         edges: step.learn.map(([id, , parent]) => [parent, id]),
       });
       Eddie.activity(step.path);
+      Eddie.sources(step.sources || [], true);
       await sleep(step.search);
     }
     if (run !== demoRun) return;
     const brain = (performance.now() - t0) / 1000;
     Eddie.latency(0.38 + 0.6 + Math.min(brain, 1.4), 0.38, Math.min(brain, 1.4));
     if (!(await speak(run, step.eddie))) return;
+    Eddie.sources(step.sources || [], false);
     Eddie.setState("listening");
     await sleep(1200);
   }
