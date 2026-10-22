@@ -26,9 +26,10 @@
     {"type": "activity", "path": ["eddie", "connector:ssb", …], "tool": "mcp__ssb__boligpriser"}
                                                              hvor i hjernen Eddie leter akkurat nå
     {"type": "sources", "items": [{kind, title, url, query?}], "pending": true}
-                                                             kildene til svaret som pågår (sources.py); pending=false når svaret er ferdig
-    {"type": "visual", "kind": "linje" | "stolpe" | "tabell", "tittel", "enhet", "kategorier": [...],
-     "serier": [{navn, verdier}], "kilde", "kommentar"}       graf eller tabell Eddie viser (connectors/visning.py)
+                                                             kildene til svaret (sources.py); vises under svaret når pending=false
+    {"type": "visuals", "items": [{"kind": "linje" | "stolpe" | "tabell", "tittel", "enhet", "kategorier": [...],
+     "serier": [{navn, verdier}], "kilde", "kommentar"}, …]}  grafene og tabellene Eddie viser nå (connectors/visning.py),
+                                                             lagt i et rutenett: 1, 2 side om side, 2×2 eller 3×3
   Kommandoer til Eddie:
     {"type": "command", "action": "talk" | "stop"}
     {"type": "command", "action": "message", "text": "..."}  skrevet melding fra chatten (maks 2000 tegn)
@@ -71,9 +72,9 @@
   .app {
     position: relative; z-index: 1; height: 100%;
     display: grid;
-    grid-template-columns: minmax(250px, 320px) 1fr minmax(280px, 380px);
+    grid-template-columns: minmax(200px, 240px) 1fr minmax(280px, 380px);
     grid-template-rows: auto 1fr auto;
-    gap: 16px; padding: 18px 24px;
+    gap: 16px; padding: 18px 24px 18px 14px;
   }
 
   /* Toppstripe */
@@ -113,21 +114,16 @@
   }
   .panel h2 small { letter-spacing: .12em; color: var(--text-dim); font-size: 11px; }
 
-  /* Venstre kolonne: kilder øverst, systemstatus under */
-  .side { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
-  .panel.sources { flex: 1 1 auto; min-height: 140px; }
-  .panel.system { flex: 0 0 auto; }
-  .src-list { list-style: none; margin: 0; padding: 0 6px 0 0; display: grid; gap: 10px; overflow-y: auto; min-height: 0;
-    scrollbar-width: thin; scrollbar-color: var(--line) transparent; align-content: start; }
-  .src-list li { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: baseline; animation: fadein .35s ease-out; }
-  .src-kind { font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase; padding: 2px 6px;
-    border: 1px solid var(--line); color: var(--state, var(--cyan)); white-space: nowrap; }
-  .src-list a, .src-list .t { color: var(--text); font-size: 15px; line-height: 1.25; text-decoration: none; overflow-wrap: anywhere; }
-  .src-list a:hover { color: #fff; text-decoration: underline; text-decoration-color: var(--state, var(--cyan)); }
-  .src-list a::after { content: " ↗"; color: var(--text-dim); font-size: 12px; }
-  .src-list .q { grid-column: 2; font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); letter-spacing: .06em; }
-  .src-note { margin: 0; color: var(--text-dim); font-size: 14px; letter-spacing: .03em; }
-  .src-note.pending::after { content: " …"; animation: blink 1s steps(2) infinite; }
+  /* Kildene vises som små lenker under svaret de hører til */
+  .msg-src { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .msg-src a, .msg-src span { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; color: var(--text-dim);
+    border: 1px solid var(--line); padding: 2px 7px; text-decoration: none; max-width: 100%; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .msg-src a:hover { color: #fff; border-color: var(--state, var(--cyan)); }
+  .msg-src b { font-weight: 500; color: var(--state, var(--cyan)); margin-right: 6px; }
+
+  .panel.system { align-self: start; max-height: 100%; overflow: hidden auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .panel.system .v { overflow-wrap: anywhere; }
 
   /* Systempanel */
   .status { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
@@ -152,14 +148,6 @@
   #hud { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
   #hud.dragging { cursor: grabbing; }
   #hud.over-core { cursor: pointer; }
-  .strip {
-    position: absolute; left: 50%; top: 2px; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
-    font-family: var(--mono); font-size: 10.5px; letter-spacing: .22em; color: var(--text-dim); text-transform: uppercase;
-    display: flex; gap: 20px;
-  }
-  @media (max-width: 1500px) { .strip .opt { display: none; } }
-  .strip b { font-weight: 500; color: var(--state, var(--cyan)); transition: color .6s; }
-  .strip .live::before { content: "● "; color: var(--state, var(--cyan)); }
   .card {
     position: absolute; min-width: 190px; max-width: 250px; padding: 8px 12px 8px 14px; pointer-events: none;
     background: rgba(14, 8, 22, .82); border: 1px solid var(--line); border-left: 2px solid var(--state, var(--cyan));
@@ -171,7 +159,6 @@
   .card .t::before { content: "◇ "; color: var(--state, var(--cyan)); }
   .card .s { margin-top: 3px; font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #card-search { left: 3%; top: 9%; }
-  #card-learned { right: 3%; top: 9%; }
   #card-source { right: 3%; bottom: 30%; }
   /* Stemmeknappen: midt under hjernen. Ringene vokser med lydnivået mens Eddie lytter (og snakker). */
   .voice { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); text-align: center; width: 92%;
@@ -203,20 +190,23 @@
   .tooltip b { display: block; font-weight: 600; color: #fff; }
   .tooltip small { display: block; margin-top: 3px; font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); letter-spacing: .08em; }
 
-  /* Grafer og tabeller Eddie viser: legger seg over hjernen til de lukkes eller byttes */
+  /* Grafer og tabeller Eddie viser: legger seg over hjernen, i et rutenett når det er flere, til de lukkes eller byttes */
+  .visuals { position: absolute; left: 1%; right: 1%; top: 6px; max-height: calc(100% - 170px); z-index: 2; display: flex; }
+  .visuals.multi { height: calc(100% - 170px); }
+  .visuals[hidden] { display: none; }
+  .core.has-visual .card { opacity: 0 !important; }
+  .vis-grid { flex: 1; min-width: 0; display: grid; gap: 10px; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+  .vis-close { position: absolute; top: -2px; right: -2px; z-index: 3; padding: 3px 8px; font-size: 13px; letter-spacing: 0; background: rgba(12, 7, 20, .95); }
   .visual {
-    position: absolute; left: 4%; right: 4%; top: 30px; max-height: calc(100% - 190px); z-index: 2;
-    display: flex; flex-direction: column; padding: 14px 18px 12px;
+    min-width: 0; min-height: 0; margin: 0; display: flex; flex-direction: column; padding: 12px 16px 10px;
     background: rgba(12, 7, 20, .9); border: 1px solid var(--line); border-top: 2px solid var(--state, var(--cyan));
     box-shadow: 0 10px 40px rgba(0, 0, 0, .5); backdrop-filter: blur(4px); animation: fadein .4s ease-out;
   }
-  .visual[hidden] { display: none; }
-  .core.has-visual .card { opacity: 0 !important; }
-  .vis-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+  .vis-head { padding-right: 28px; }
   .vis-head h3 { margin: 0; font-family: var(--body); font-weight: 600; font-size: 19px; color: #f3e8ff; letter-spacing: .02em; }
+  .multi .vis-head h3 { font-size: 16px; }
   .vis-head small { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
-  .vis-close { padding: 4px 9px; font-size: 14px; letter-spacing: 0; }
-  .vis-body { flex: 1; min-height: 0; overflow: auto; margin-top: 10px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .vis-body { flex: 1; min-height: 0; overflow: auto; margin-top: 8px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .vis-body svg { width: 100%; height: auto; display: block; font-family: var(--mono); }
   .vis-body svg text { fill: var(--text-dim); font-size: 11px; }
   .vis-body svg .grid { stroke: rgba(220, 160, 255, .1); }
@@ -277,11 +267,11 @@
     body { overflow: auto; }
     .app { height: auto; min-height: 100%; grid-template-columns: 1fr; padding: 14px 16px; }
     .core { height: min(115vw, 620px); order: -1; grid-row: 2; }
-    .side { grid-row: 4; }
+    .panel.system { grid-row: 4; }
     .panel.convo { grid-row: 3; max-height: 60vh; }
     footer { grid-row: 5; grid-template-columns: 1fr; }
     .controls { justify-content: flex-start; }
-    .brand span, .strip span:nth-child(n+3), #card-source { display: none; }
+    .brand span, #card-source { display: none; }
     .card { min-width: 0; max-width: 46%; }
     .voice { bottom: 2%; }
   }
@@ -300,13 +290,6 @@
     <div class="clock"><div class="time" id="time">--:--:--</div><div class="date" id="date"></div></div>
   </header>
 
-  <div class="side">
-  <section class="panel sources" aria-label="Kildene Eddie bruker">
-    <h2>KILDER <small id="src-count">0</small></h2>
-    <ul class="src-list" id="sources"></ul>
-    <p class="src-note" id="src-note">Kildene Eddie bruker vises her når han svarer.</p>
-  </section>
-
   <section class="panel system" aria-label="Systemstatus">
     <h2>SYSTEM <small id="uptime">00:00</small></h2>
     <ul class="status" id="status"></ul>
@@ -317,28 +300,16 @@
       <canvas id="spark" aria-hidden="true"></canvas>
     </div>
   </section>
-  </div>
 
   <section class="core" aria-label="Eddies hjerne: det han er koblet til og vet om">
     <canvas id="hud" aria-hidden="true"></canvas>
-    <div class="strip" aria-hidden="true">
-      <span class="live">Hjerne · <b id="strip-state">standby</b></span>
-      <span>Link · <b id="strip-link">demo</b></span>
-      <span>Connectors · <b id="strip-conn">0</b></span>
-      <span>Noder · <b id="brain-count">0</b></span>
-      <span class="opt">Partikler · <b id="strip-particles">0</b></span>
-    </div>
     <div class="card" id="card-search"><div class="t">Leter i</div><div class="s"></div></div>
-    <div class="card" id="card-learned"><div class="t">Sist lært</div><div class="s"></div></div>
     <div class="card" id="card-source"><div class="t">Kilde</div><div class="s"></div></div>
     <div class="tooltip" id="tooltip" role="tooltip"></div>
-    <figure class="visual" id="visual" hidden aria-live="polite" style="margin:0">
-      <div class="vis-head"><div><h3 id="vis-title"></h3><small id="vis-unit"></small></div>
-        <button class="vis-close" id="vis-close" aria-label="Lukk visningen">✕</button></div>
-      <div class="vis-body" id="vis-body"></div>
-      <div class="vis-legend" id="vis-legend"></div>
-      <figcaption class="vis-foot"><span id="vis-note"></span> <span class="src" id="vis-src"></span></figcaption>
-    </figure>
+    <div class="visuals" id="visuals" hidden aria-live="polite">
+      <div class="vis-grid" id="vis-grid"></div>
+      <button class="vis-close" id="vis-close" aria-label="Lukk visningene">✕</button>
+    </div>
     <div class="voice">
       <button class="mic" id="talk" aria-pressed="false" aria-label="Start samtale">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
@@ -412,21 +383,14 @@ const ui = {
   spark: document.getElementById("spark"),
   connDot: document.getElementById("conn-dot"),
   connText: document.getElementById("conn-text"),
-  stripState: document.getElementById("strip-state"),
-  stripLink: document.getElementById("strip-link"),
-  stripConn: document.getElementById("strip-conn"),
-  stripParticles: document.getElementById("strip-particles"),
-  brainCount: document.getElementById("brain-count"),
   brainSub: document.getElementById("brain-sub"),
-  sources: document.getElementById("sources"),
-  srcNote: document.getElementById("src-note"),
-  srcCount: document.getElementById("src-count"),
 };
 
 const S = {
   state: "idle", level: 0, levelTarget: 0, t: 0, glow: 0.45, spin: 0.1,
   color: [...STATES.idle.color], latencies: [], messages: 0,
   live: null,       // Eddie-melding som skrives nå
+  lastEddie: null,  // siste svar fra Eddie; kildene festes under det
   activity: null,   // {path, t0, fadeAt} – hvor Eddie leter
 };
 
@@ -437,7 +401,6 @@ const Eddie = {
     S.state = name;
     const st = STATES[name];
     ui.stateLabel.textContent = st.label;
-    ui.stripState.textContent = st.label;
     document.documentElement.style.setProperty("--state", `rgb(${st.color.join(",")})`);
     ui.hint.textContent = st.hint;
     if (name !== "speaking" && name !== "listening") S.levelTarget = 0;
@@ -450,7 +413,7 @@ const Eddie = {
     ui.subtitle.textContent = "«" + text + "»";
   },
   eddieSays(chunk, final = false) {
-    if (!S.live) S.live = addMessage("eddie", "EDDIE", "");
+    if (!S.live) S.live = S.lastEddie = addMessage("eddie", "EDDIE", "");
     const txt = S.live.querySelector(".txt");
     txt.textContent += chunk;
     ui.subtitle.textContent = lastSentence(txt.textContent);
@@ -484,13 +447,15 @@ const Eddie = {
     drawSpark();
   },
   graph(snapshot, replace = false) { mergeGraph(snapshot, replace); },
-  visual(spec) { showVisual(spec); },
+  visuals(items) { showVisuals(items); },
   sources(items, pending) {
-    ui.sources.replaceChildren(...items.map(sourceItem));
-    ui.srcCount.textContent = items.length;
-    ui.srcNote.hidden = items.length > 0;
-    ui.srcNote.classList.toggle("pending", pending && !items.length);
-    ui.srcNote.textContent = pending ? "Eddie svarer" : "Ingen kilder – Eddie svarte fra egen kunnskap.";
+    if (pending || !items.length || !S.lastEddie) return;
+    S.lastEddie.querySelector(".msg-src")?.remove();
+    const box = document.createElement("div");
+    box.className = "msg-src";
+    box.append(...items.map(sourceItem));
+    S.lastEddie.append(box);
+    scrollLog();
   },
   activity(path) {
     const known = path.filter(id => G.nodes.has(id));
@@ -509,24 +474,15 @@ const STATUS_LABELS = {
 };
 
 function sourceItem(src) {
-  const li = document.createElement("li");
-  const kind = document.createElement("span");
-  kind.className = "src-kind";
-  kind.textContent = src.kind || "Kilde";
   // Bare vanlige nettadresser blir lenker; alt annet (minner, rare verdier) vises som tekst.
   const safe = /^https?:\/\//i.test(src.url || "");
-  const title = document.createElement(safe ? "a" : "span");
-  title.className = "t";
-  title.textContent = src.title || src.url || "";
-  if (safe) { title.href = src.url; title.target = "_blank"; title.rel = "noopener noreferrer"; title.title = src.url; }
-  li.append(kind, title);
-  if (src.query) {
-    const q = document.createElement("span");
-    q.className = "q";
-    q.textContent = "søk: " + src.query;
-    li.append(q);
-  }
-  return li;
+  const el = document.createElement(safe ? "a" : "span");
+  const kind = document.createElement("b");
+  kind.textContent = src.kind || "Kilde";
+  el.append(kind, src.title || src.url || "");
+  el.title = [src.title, src.query && "søk: " + src.query, src.url].filter(Boolean).join("\n");
+  if (safe) { el.href = src.url; el.target = "_blank"; el.rel = "noopener noreferrer"; }
+  return el;
 }
 
 function addMessage(cls, who, text) {
@@ -553,7 +509,8 @@ function lastSentence(text) {
 const VIS_COLORS = ["#f0abfc", "#4fd8ff", "#ffb547", "#57ffb0", "#c4b5fd", "#fb7185", "#fde047", "#93c5fd"];
 const SVG_NS = "http://www.w3.org/2000/svg";
 const numFmt = new Intl.NumberFormat("no-NO", { maximumFractionDigits: 1 });
-const visEl = document.getElementById("visual");
+const visEl = document.getElementById("visuals");
+const visGrid = document.getElementById("vis-grid");
 
 function svgEl(tag, attrs = {}, text) {
   const el = document.createElementNS(SVG_NS, tag);
@@ -575,10 +532,12 @@ function shortNum(v) {
   return a >= 1e6 ? numFmt.format(v / 1e6) + " mill" : a >= 1e4 ? numFmt.format(v / 1e3) + "k" : numFmt.format(v);
 }
 
-function chartSvg(spec) {
-  // Tegnes i faktisk bredde, så teksten har vanlig størrelse også når midtkolonnen er smal.
-  const W = Math.max(300, Math.round(document.getElementById("vis-body").clientWidth || 640));
-  const H = Math.round(Math.min(300, Math.max(190, W * 0.45))), L = 56, R = 14, T = 12, Bm = 30;
+function chartSvg(spec, body, fill) {
+  // Tegnes i faktisk størrelse, så teksten er lesbar også i en liten rute.
+  // fill: rutenett med flere visninger, der grafen fyller ruten; ellers en høyde som passer bredden.
+  const W = Math.max(220, Math.round(body.clientWidth || 640));
+  const H = fill ? Math.max(110, Math.round(body.clientHeight - 4)) : Math.round(Math.min(320, Math.max(190, W * 0.45)));
+  const L = 56, R = 14, T = 12, Bm = 30;
   const cats = spec.kategorier, series = spec.serier, bars = spec.kind === "stolpe";
   const values = series.flatMap(s => s.verdier).filter(v => v != null);
   let min = Math.min(...values), max = Math.max(...values);
@@ -595,8 +554,12 @@ function chartSvg(spec) {
   }
   svg.append(svgEl("line", { class: "axis", x1: L, x2: W - R, y1: y(Math.max(lo, 0)), y2: y(Math.max(lo, 0)) }));
   const every = Math.ceil(cats.length / Math.max(3, Math.floor(W / 60)));  // etiketter med god avstand
+  const maxChars = Math.max(4, Math.floor(band * every / 7));  // ca. 7 px per tegn i 11 px monospace
   cats.forEach((c, i) => {
-    if (i % every === 0) svg.append(svgEl("text", { x: x(i), y: H - 10, "text-anchor": "middle" }, c));
+    if (i % every) return;
+    const label = svgEl("text", { x: x(i), y: H - 10, "text-anchor": "middle" }, c.length > maxChars ? c.slice(0, maxChars - 1) + "…" : c);
+    label.append(svgEl("title", {}, c));
+    svg.append(label);
   });
   series.forEach((s, si) => {
     const color = VIS_COLORS[si % VIS_COLORS.length];
@@ -640,30 +603,53 @@ function tableEl(spec) {
   return table;
 }
 
-let lastVisual = null;
-function showVisual(spec) {
-  if (!Array.isArray(spec.kategorier) || !Array.isArray(spec.serier)) return;
-  lastVisual = spec;
-  visEl.hidden = false;  // synlig før tegning, så bredden kan måles
-  document.getElementById("vis-title").textContent = spec.tittel || "";
-  document.getElementById("vis-unit").textContent = spec.enhet || "";
-  document.getElementById("vis-body").replaceChildren(spec.kind === "tabell" ? tableEl(spec) : chartSvg(spec));
-  const legend = document.getElementById("vis-legend");
-  legend.replaceChildren(...(spec.kind === "tabell" || spec.serier.length < 2 ? [] : spec.serier.map((s, i) => {
+let shownVisuals = [];
+function legendEl(spec) {
+  const legend = document.createElement("div");
+  legend.className = "vis-legend";
+  if (spec.kind !== "tabell" && spec.serier.length > 1) legend.append(...spec.serier.map((s, i) => {
     const item = document.createElement("span");
     const swatch = document.createElement("i");
     swatch.style.background = VIS_COLORS[i % VIS_COLORS.length];
     item.append(swatch, s.navn);
     return item;
-  })));
-  document.getElementById("vis-note").textContent = spec.kommentar || "";
-  document.getElementById("vis-src").textContent = spec.kilde ? "Kilde: " + spec.kilde : "";
-  visEl.hidden = false;
+  }));
+  return legend;
+}
+function tile(spec) {
+  const fig = document.createElement("figure");
+  fig.className = "visual";
+  fig.innerHTML = `<div class="vis-head"><h3></h3><small></small></div><div class="vis-body"></div>
+    <figcaption class="vis-foot"><span></span> <span class="src"></span></figcaption>`;
+  fig.querySelector("h3").textContent = spec.tittel || "";
+  fig.querySelector("small").textContent = spec.enhet || "";
+  fig.querySelector(".vis-body").after(legendEl(spec));
+  fig.querySelector(".vis-foot span").textContent = spec.kommentar || "";
+  fig.querySelector(".vis-foot .src").textContent = spec.kilde ? "Kilde: " + spec.kilde : "";
+  return fig;
+}
+function showVisuals(items) {
+  shownVisuals = (items || []).filter(v => Array.isArray(v?.kategorier) && Array.isArray(v?.serier)).slice(-9);
+  if (!shownVisuals.length) return hideVisuals();
+  const n = shownVisuals.length, cols = n === 1 ? 1 : n <= 4 ? 2 : 3;  // 1, 2 side om side, 2×2, 3×3
+  visEl.hidden = false;  // synlig før tegning, så rutene kan måles
+  visEl.classList.toggle("multi", n > 1);
+  visGrid.style.setProperty("--cols", cols);
+  const tiles = shownVisuals.map(tile);
+  visGrid.replaceChildren(...tiles);
+  tiles.forEach((fig, i) => {
+    const spec = shownVisuals[i], body = fig.querySelector(".vis-body");
+    body.append(spec.kind === "tabell" ? tableEl(spec) : chartSvg(spec, body, n > 1));
+  });
   ui.core.classList.add("has-visual");
 }
-function hideVisual() { visEl.hidden = true; lastVisual = null; ui.core.classList.remove("has-visual"); }
-window.addEventListener("resize", () => { if (lastVisual) showVisual(lastVisual); });
-document.getElementById("vis-close").addEventListener("click", hideVisual);
+function hideVisuals() { visEl.hidden = true; shownVisuals = []; visGrid.replaceChildren(); ui.core.classList.remove("has-visual"); }
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (shownVisuals.length) showVisuals(shownVisuals); }, 120);
+});
+document.getElementById("vis-close").addEventListener("click", hideVisuals);
 
 /* ---------- Klokke ---------- */
 const started = Date.now();
@@ -689,12 +675,10 @@ function hash(str, seed = 0) {
 function mergeGraph(snap, replace) {
   if (replace) { G.nodes.clear(); G.edges = []; G.parent.clear(); S.activity = null; }
   const parentOf = new Map(snap.edges.map(([a, b]) => [b, a]));
-  const learned = [];
   for (const n of snap.nodes) {
     const old = G.nodes.get(n.id);
     if (old) { Object.assign(old, { label: n.label, type: n.type, info: n.info, uses: n.uses }); continue; }
     G.nodes.set(n.id, { ...n, born: S.t, fresh: !replace && G.nodes.size > 0 });
-    if (!replace && n.type === "content") learned.push(n.id);
   }
   const have = new Set(G.edges.map(e => e.join(">")));
   for (const [a, b] of snap.edges) {
@@ -702,18 +686,6 @@ function mergeGraph(snap, replace) {
   }
   for (const [b, a] of parentOf) if (G.nodes.has(a) && G.nodes.has(b)) G.parent.set(b, a);
   layoutBrain();
-  if (learned.length) {
-    const n = G.nodes.get(learned[learned.length - 1]);
-    showCard("learned", `${n.label} · ${TYPES[n.type]?.name || n.type}`, n.id, true);
-  }
-  updateReadout();
-}
-
-function updateReadout() {
-  const counts = {};
-  for (const n of G.nodes.values()) counts[n.type] = (counts[n.type] || 0) + 1;
-  ui.brainCount.textContent = G.nodes.size;
-  ui.stripConn.textContent = counts.connector || 0;
 }
 
 /* ---------- Hjernen i 3D ---------- */
@@ -752,7 +724,7 @@ const norm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / 
 
 /* Fyllpartiklene er vev rundt de ekte nodene: pynt, men antallet følger hvor mye Eddie vet. */
 function growFiller() {
-  const target = Math.max(380, Math.min(1500, 260 + 34 * G.nodes.size));
+  const target = Math.max(760, Math.min(3000, 520 + 68 * G.nodes.size));
   const real = [...G.nodes.values()].filter(n => n.id !== "eddie");
   while (B.filler.length < target) {
     // Litt tettere rundt de ekte nodene, ellers jevnt i kula.
@@ -776,13 +748,11 @@ function growFiller() {
     }
     best.sort((a, b) => a[0] - b[0]).slice(0, 2).forEach(([, j]) => B.links.push([i, j]));
   }
-  ui.stripParticles.textContent = B.filler.length + G.nodes.size;
 }
 
 /* ---------- Infokort ---------- */
 const cards = {
   search: { el: document.getElementById("card-search"), node: null, until: 0 },
-  learned: { el: document.getElementById("card-learned"), node: null, until: 0 },
   source: { el: document.getElementById("card-source"), node: null, until: 0 },
 };
 function showCard(key, text, nodeId, sticky = false) {
@@ -798,7 +768,6 @@ function updateCards() {
     if (!c.node) continue;
     if (c.until !== Infinity && S.t > c.until) { c.el.classList.remove("show"); c.node = null; }
   }
-  if (cards.learned.node && S.t - (G.nodes.get(cards.learned.node)?.born || 0) > 25) cards.learned.el.classList.add("dim");
 }
 
 /* ---------- Tegning ---------- */
@@ -1138,7 +1107,6 @@ function setConnection(ok) {
   connected = ok;
   ui.connDot.className = "dot " + (ok ? "ok" : "warn");
   ui.connText.textContent = ok ? "Tilkoblet Eddie" : "Demomodus";
-  ui.stripLink.textContent = ok ? "online" : "demo";
   Eddie.setStatus("link", ok ? "Tilkoblet " + WS_URL.replace(/^wss?:\/\//, "").replace(/\/ws$/, "")
                              : "Frakoblet – demomodus", ok ? true : null);
 }
@@ -1175,7 +1143,7 @@ function connect() {
       case "graph": Eddie.graph(m, !realGraph); realGraph = true; break;
       case "activity": Eddie.activity(m.path || []); break;
       case "sources": Eddie.sources(Array.isArray(m.items) ? m.items : [], !!m.pending); break;
-      case "visual": Eddie.visual(m); break;
+      case "visuals": Eddie.visuals(Array.isArray(m.items) ? m.items : []); break;
     }
   };
 }
@@ -1279,7 +1247,7 @@ async function runDemo() {
   for (const step of SCRIPT) {
     if (!(await listen(run, step.user))) return;
     Eddie.sources([], true);
-    hideVisual();
+    hideVisuals();
     const t0 = performance.now();
     Eddie.setState("thinking");
     await sleep(step.think);
@@ -1292,7 +1260,7 @@ async function runDemo() {
       });
       Eddie.activity(step.path);
       Eddie.sources(step.sources || [], true);
-      if (step.visual) Eddie.visual(step.visual);
+      if (step.visual) Eddie.visuals([step.visual]);
       await sleep(step.search);
     }
     if (run !== demoRun) return;
