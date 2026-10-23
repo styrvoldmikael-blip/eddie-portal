@@ -49,8 +49,8 @@
      Fontene etterligner OBOS Text og OBOS Display (som er OBOS' egne og ikke kan brukes fritt). */
   :root {
     --navy: #002169;
-    --bg: #001542;
-    --bg-2: #002169;
+    --bg: #000920;
+    --bg-2: #00143D;
     --cyan: #BEDFEC;
     --cyan-bright: #E3F1F7;
     --cyan-dim: rgba(190, 223, 236, 0.28);
@@ -61,7 +61,7 @@
     --obos-green: #008761;
     --text: #F3F7FB;
     --text-dim: #A9C4DD;
-    --panel: rgba(0, 24, 80, 0.55);
+    --panel: rgba(0, 18, 58, 0.6);
     --line: rgba(190, 223, 236, 0.18);
     --head: "Inter Tight", "Inter", "Segoe UI", Arial, sans-serif;
     --body: "Inter", "Segoe UI", Arial, sans-serif;
@@ -71,7 +71,7 @@
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
-    background: radial-gradient(ellipse at 50% 42%, #0A3486 0%, var(--bg-2) 45%, var(--bg) 85%), var(--bg);
+    background: radial-gradient(ellipse at 50% 42%, #03225F 0%, var(--bg-2) 45%, var(--bg) 85%), var(--bg);
     color: var(--text);
     font-family: var(--body);
     font-size: 16px;
@@ -483,11 +483,11 @@
 
 /* ---------- Tilstander: fargen hele hjernen tones mot ---------- */
 const STATES = {
-  idle:      { label: "Standby", color: [190, 223, 236], glow: 0.45, spin: 0.10, hint: "Trykk kort på høyre Ctrl for å snakke" },
-  listening: { label: "Lytter",  color: [108, 194, 163], glow: 0.9,  spin: 0.14, hint: "Snakk – Eddie lytter" },
-  thinking:  { label: "Tenker",  color: [127, 191, 214], glow: 0.85, spin: 0.42, hint: "Eddie tenker …" },
-  searching: { label: "Leter",   color: [255, 255, 255], glow: 0.95, spin: 0.26, hint: "Eddie leter i hjernen …" },
-  speaking:  { label: "Snakker", color: [76, 201, 146],  glow: 1.0,  spin: 0.18, hint: "Snakk for å avbryte" },
+  idle:      { label: "Standby", color: [96, 140, 205],  glow: 0.45, spin: 0.10, hint: "Trykk kort på høyre Ctrl for å snakke" },
+  listening: { label: "Lytter",  color: [110, 200, 240], glow: 0.9,  spin: 0.14, hint: "Snakk – Eddie lytter" },
+  thinking:  { label: "Tenker",  color: [233, 196, 106], glow: 0.85, spin: 0.42, hint: "Eddie tenker …" },
+  searching: { label: "Leter",   color: [255, 236, 190], glow: 0.95, spin: 0.26, hint: "Eddie leter i hjernen …" },
+  speaking:  { label: "Snakker", color: [30, 185, 125],  glow: 1.0,  spin: 0.18, hint: "Snakk for å avbryte" },
   error:     { label: "Feil",    color: [224, 96, 126],  glow: 0.8,  spin: 0.05, hint: "Noe gikk galt – se loggen" },
 };
 
@@ -1062,9 +1062,10 @@ function drawFloor(sc) {
 
 let hover = null;
 
-function draw(dt) {
+function draw(dt, elapsed = dt) {
   const st = STATES[S.state];
-  const k = Math.min(1, dt * 2.5);
+  // Fargen følger klokka, ikke antall bilder: også en travel maskin eller en delvis skjult fane bytter farge på ca. 1 s.
+  const k = 1 - Math.exp(-Math.min(elapsed, 2) * 3);
   S.color = mix(S.color, st.color, k);
   S.glow = lerp(S.glow, st.glow, k);
   S.spin = lerp(S.spin, reduced ? 0.02 : st.spin, k);
@@ -1091,7 +1092,7 @@ function draw(dt) {
 
   // Glød i midten av skyen.
   const halo = ctx.createRadialGradient(CX, CY, 0, CX, CY, B.R * 1.25);
-  halo.addColorStop(0, rgba(mix(sc, [255, 255, 255], 0.25), (0.16 + 0.14 * S.glow + 0.2 * S.level) * (1 - 0.6 * fl)));
+  halo.addColorStop(0, rgba(mix(sc, [255, 255, 255], 0.08), (0.12 + 0.1 * S.glow + 0.18 * S.level) * (1 - 0.6 * fl)));
   halo.addColorStop(0.45, rgba(sc, (0.06 + 0.06 * S.glow) * (1 - 0.6 * fl)));
   halo.addColorStop(1, rgba(sc, 0));
   ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
@@ -1104,7 +1105,7 @@ function draw(dt) {
   if (thinking && !reduced && Math.random() < dt * 40) B.filler[Math.floor(Math.random() * B.filler.length)].flash = 1;
 
   // Tråder mellom fyllpartikler, i tre lag etter dybde (én strek per lag).
-  const linkColor = mix(sc, [227, 241, 247], 0.2);
+  const linkColor = mix(sc, [227, 241, 247], 0.08);
   for (let layer = 0; layer < 3; layer++) {
     ctx.beginPath();
     for (const [i, j] of B.links) {
@@ -1113,7 +1114,7 @@ function draw(dt) {
       ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
     }
     ctx.lineWidth = 0.6 + layer * 0.15;
-    ctx.strokeStyle = rgba(linkColor, (0.035 + 0.05 * layer) * (0.7 + 0.5 * S.glow) * (1 - 0.8 * fl));
+    ctx.strokeStyle = rgba(linkColor, (0.03 + 0.04 * layer) * (0.7 + 0.5 * S.glow) * (1 - 0.8 * fl));
     ctx.stroke();
   }
   if (fw) {
@@ -1131,7 +1132,7 @@ function draw(dt) {
   for (let i = 0; i < B.filler.length; i++) {
     const f = B.filler[i], p = pts[i];
     f.flash *= Math.exp(-dt * 3);
-    let a = 0.25 + 0.55 * p[2];
+    let a = (0.25 + 0.55 * p[2]) * 0.8;  // litt dempet: mot marineblått blir lyse punkter fort skarpe
     if (!reduced) a *= 0.75 + 0.25 * Math.sin(S.t * 1.7 + f.phase);
     if (S.state === "speaking") {
       // Bølger som går gjennom skyen når han snakker.
@@ -1144,7 +1145,7 @@ function draw(dt) {
     a *= Math.min(1, (S.t - f.born) / 1.5);
     buckets[Math.max(0, Math.min(5, Math.floor(a * 6)))].push([p[0], p[1], f.size * p[3] * (0.8 + p[2] * 0.7)]);
   }
-  const dotColor = mix(sc, [255, 255, 255], 0.35);
+  const dotColor = mix(sc, [255, 255, 255], 0.1);  // lite hvitt, så tilstandsfargen synes
   buckets.forEach((list, b) => {
     if (!list.length) return;
     ctx.fillStyle = rgba(dotColor, (b + 0.5) / 6);
@@ -1174,7 +1175,7 @@ function draw(dt) {
     ctx.fillStyle = spot; ctx.fillRect(t[0] - rad, t[1] - rad, rad * 2, rad * 2);
   }
 
-  const edgeColor = mix(sc, [255, 255, 255], 0.3);
+  const edgeColor = mix(sc, [255, 255, 255], 0.15);
   ctx.beginPath();
   for (const [ia, ib] of G.edges) {
     const a = G.nodes.get(ia).s, b = G.nodes.get(ib).s;
@@ -1200,7 +1201,7 @@ function draw(dt) {
     const grow = n.fresh ? Math.min(1, (S.t - n.born) / 1.2) : 1;
     let r = (ty.r + Math.min(2.5, Math.log2((n.uses || 0) + 1))) * n.s[3] * (0.7 + depth * 0.5) * grow;
     if (n.type === "core") r *= 1.2 + 0.08 * Math.sin(S.t * 2) + 0.5 * S.level;
-    let color = mix(ty.color, sc, n.type === "core" ? 0.55 : 0.3);
+    let color = mix(ty.color, sc, n.type === "core" ? 0.6 : 0.5);  // nodene skifter farge med tilstanden
     if (isLit && n.type !== "core") { color = mix(color, [255, 255, 255], 0.45); r *= 1.5 + 0.2 * Math.sin(S.t * 6) * fade; }
     const focus = fl ? lerp(1, 0.15 + 0.85 * (F.nodes.get(n.id) || 0), fl) : 1;
     glowDot(n.s[0], n.s[1], Math.max(0.6, r), color, (0.45 + 0.55 * depth) * (isLit ? 1 : 0.9) * focus,
@@ -1233,9 +1234,10 @@ function glowDot(x, y, r, color, alpha, blur = 12) {
 
 let last = performance.now();
 function loop(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const elapsed = (now - last) / 1000;
+  const dt = Math.min(0.05, elapsed);  // bevegelse: ingen hopp etter en pause
   last = now;
-  draw(dt);
+  draw(dt, elapsed);
   talkBtn.style.setProperty("--lvl", S.level.toFixed(3));
   requestAnimationFrame(loop);
 }
