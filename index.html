@@ -41,7 +41,8 @@
      metoder}]}                                              prosjekthubene (projects.py): én oversikt per prosjektmappe
     {"type": "mute", "muted": true}                          stemmen er dempet: Eddie svarer bare med tekst
   Kommandoer til Eddie:
-    {"type": "command", "action": "talk" | "stop" | "mute" | "unmute" | "projects"}   projects = les prosjektene på nytt
+    {"type": "command", "action": "talk" | "stop" | "mute" | "unmute" | "projects" | "clear_visuals"}
+                                                             projects = les prosjektene på nytt; clear_visuals = lukk grafene
     {"type": "command", "action": "message", "text": "..."}  skrevet melding fra chatten (maks 2000 tegn)
     {"type": "command", "action": "add_visual", "nummer": 2, "presentasjon": "<id>" | "", "kind": "prosjekt"}
                                                              dra-og-slipp: graf 2 inn i en samling ("" = ny av typen kind)
@@ -932,7 +933,10 @@ window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => { if (shownVisuals.length) showVisuals(shownVisuals); }, 120);
 });
-document.getElementById("vis-close").addEventListener("click", hideVisuals);
+document.getElementById("vis-close").addEventListener("click", () => {
+  hideVisuals();
+  sendCommand({ action: "clear_visuals" });  // også hos Eddie, så de ikke kommer tilbake i en ny fane
+});
 
 /* ---------- System som nedtrekksmeny ---------- */
 const sysmenu = document.getElementById("sysmenu");
