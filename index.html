@@ -493,13 +493,16 @@ const STATES = {
 
 /* Nodetyper fra knowledge_graph.py: farge, størrelse, avstand fra kjernen, navn */
 const TYPES = {
-  core:      { color: [255, 245, 255], r: 7,   name: "Eddie",     one: "",          plural: "" },
-  connector: { color: [190, 223, 236], r: 5,   name: "Connector", one: "connector", plural: "connectorer" },
-  hub:       { color: [227, 241, 247], r: 4.2, name: "Samling",   one: "samling",   plural: "samlinger" },
-  tool:      { color: [127, 191, 214], r: 3.2, name: "Verktøy",   one: "verktøy",   plural: "verktøy" },
-  knowledge: { color: [108, 194, 163], r: 2.8, name: "Kunnskap",  one: "kunnskap",  plural: "kunnskap" },
-  memory:    { color: [205, 236, 226], r: 3.2, name: "Minne",     one: "minne",     plural: "minner" },
-  content:   { color: [233, 196, 106], r: 3.4, name: "Innhold",   one: "innhold",   plural: "innhold" },
+  // Bare de store kategoriene (connectorer som SSB, og samlinger som Dokumenter) er store og har navn i hjernen.
+  // Alt under dem (verktøy, tabeller, nettsteder, dokumenter, minner) er små noder uten navn; navnet vises når
+  // man holder musen over.
+  core:      { color: [255, 245, 255], r: 7.5, name: "Eddie",     one: "",          plural: "", big: true },
+  connector: { color: [190, 223, 236], r: 6.5, name: "Connector", one: "connector", plural: "connectorer", big: true },
+  hub:       { color: [227, 241, 247], r: 5.5, name: "Samling",   one: "samling",   plural: "samlinger", big: true },
+  tool:      { color: [127, 191, 214], r: 2,   name: "Verktøy",   one: "verktøy",   plural: "verktøy" },
+  knowledge: { color: [108, 194, 163], r: 1.9, name: "Kunnskap",  one: "kunnskap",  plural: "kunnskap" },
+  memory:    { color: [205, 236, 226], r: 2,   name: "Minne",     one: "minne",     plural: "minner" },
+  content:   { color: [233, 196, 106], r: 2.2, name: "Innhold",   one: "innhold",   plural: "innhold" },
 };
 
 const ui = {
@@ -1199,10 +1202,11 @@ function draw(dt, elapsed = dt) {
     const ty = TYPES[n.type] || TYPES.content;
     const isLit = lit.has(n.id), depth = n.s[2];
     const grow = n.fresh ? Math.min(1, (S.t - n.born) / 1.2) : 1;
-    let r = (ty.r + Math.min(2.5, Math.log2((n.uses || 0) + 1))) * n.s[3] * (0.7 + depth * 0.5) * grow;
+    // Mye brukte noder blir litt større, de små bare litt, så de aldri ser ut som en kategori.
+    let r = (ty.r + Math.min(ty.big ? 2.5 : 0.8, Math.log2((n.uses || 0) + 1) * (ty.big ? 1 : 0.3))) * n.s[3] * (0.7 + depth * 0.5) * grow;
     if (n.type === "core") r *= 1.2 + 0.08 * Math.sin(S.t * 2) + 0.5 * S.level;
     let color = mix(ty.color, sc, n.type === "core" ? 0.6 : 0.5);  // nodene skifter farge med tilstanden
-    if (isLit && n.type !== "core") { color = mix(color, [255, 255, 255], 0.45); r *= 1.5 + 0.2 * Math.sin(S.t * 6) * fade; }
+    if (isLit && n.type !== "core") { color = mix(color, [255, 255, 255], 0.45); r *= (big ? 1.5 : 1.8) + 0.2 * Math.sin(S.t * 6) * fade; }
     const focus = fl ? lerp(1, 0.15 + 0.85 * (F.nodes.get(n.id) || 0), fl) : 1;
     glowDot(n.s[0], n.s[1], Math.max(0.6, r), color, (0.45 + 0.55 * depth) * (isLit ? 1 : 0.9) * focus,
             n.type === "core" ? 18 + 24 * S.level : isLit ? 18 : n.type === "connector" || n.type === "hub" ? 10 : 5);
@@ -1213,7 +1217,7 @@ function draw(dt, elapsed = dt) {
     }
     const big = n.type === "connector" || n.type === "hub";
     const inBranch = fl > 0.3 && F.nodes.has(n.id);
-    if ((big || isLit || inBranch || n === hover || (n.type === "content" && depth > 0.45)) && n.type !== "core") {
+    if ((big || n === hover) && n.type !== "core") {  // navn bare på de store kategoriene (og den man peker på)
       ctx.globalCompositeOperation = "source-over";
       ctx.font = `${big ? 600 : 500} ${big ? 13 : 12}px Rajdhani, "Segoe UI", sans-serif`;
       ctx.fillStyle = isLit || n === hover ? "rgba(255,255,255,.96)"
