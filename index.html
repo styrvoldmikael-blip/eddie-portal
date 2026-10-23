@@ -31,13 +31,15 @@
      "serier": [{navn, verdier}], "kilde", "kommentar"}, …]}  grafene og tabellene Eddie viser nå (connectors/visning.py),
                                                              lagt i et rutenett: 1, 2 side om side, 2×2 eller 3×3,
                                                              og nummerert 1, 2, 3 … så Mikael kan si «ta med graf 2»
-    {"type": "deck", "tittel", "antall", "utkast": "presentasjoner/utkast.html", "arkiv": [{fil, tittel, lagret, lysbilder}],
-    }                                                        presentasjonen under arbeid (connectors/presentasjon.py)
+    {"type": "decks", "items": [{id, fil, tittel, endret, lysbilder, ferdig, aktiv, redigerbar}]}
+                                                             alle presentasjonene (connectors/presentasjon.py)
     {"type": "deck_open", "path": "presentasjoner/…"}        åpne en presentasjon i visningen nå
     {"type": "mute", "muted": true}                          stemmen er dempet: Eddie svarer bare med tekst
   Kommandoer til Eddie:
     {"type": "command", "action": "talk" | "stop" | "mute" | "unmute"}
     {"type": "command", "action": "message", "text": "..."}  skrevet melding fra chatten (maks 2000 tegn)
+    {"type": "command", "action": "add_visual", "nummer": 2, "presentasjon": "<id>" | ""}
+                                                             dra-og-slipp: graf 2 inn i en presentasjon ("" = ny)
 -->
 <style>
   :root {
@@ -127,7 +129,32 @@
   .msg-src a:hover { color: #fff; border-color: var(--state, var(--cyan)); }
   .msg-src b { font-weight: 500; color: var(--state, var(--cyan)); margin-right: 6px; }
 
-  .panel.system { align-self: start; max-height: 100%; overflow: hidden auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  /* Venstre kolonne: System øverst, Presentasjoner under */
+  .side { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  .panel.system { flex: 0 1 auto; min-height: 0; overflow: hidden auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .panel.decks { flex: 1 1 auto; min-height: 150px; }
+  .deck-list { list-style: none; margin: 0; padding: 0 4px 0 0; display: grid; gap: 6px; align-content: start;
+    overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .deck-list li {
+    padding: 7px 9px; border: 1px solid var(--line); cursor: pointer; transition: border-color .15s, background .15s;
+    background: rgba(5, 3, 10, .35);
+  }
+  .deck-list li:hover { border-color: var(--state, var(--cyan)); background: rgba(240, 171, 252, .06); }
+  .deck-list .t { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.2; overflow-wrap: anywhere; }
+  .deck-list .m { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); margin-top: 3px; }
+  .deck-list .m b { font-weight: 500; color: var(--state, var(--cyan)); }
+  .deck-list li.new { border-style: dashed; color: var(--text-dim); font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: .14em; text-transform: uppercase; text-align: center; cursor: default; }
+  .deck-list li.locked { opacity: .65; }
+  /* Mens en graf dras: presentasjonene som kan ta imot den, lyser opp */
+  body.dragging-visual .deck-list li:not(.locked) { border-color: var(--state, var(--cyan)); border-style: dashed; }
+  .deck-list li.over { background: rgba(240, 171, 252, .16); box-shadow: 0 0 14px rgba(240, 171, 252, .3); }
+  .deck-list li.added { animation: added .9s ease-out; }
+  @keyframes added { 0% { background: rgba(87, 255, 176, .3); } }
+  .deck-note { margin: 8px 0 0; font-size: 13px; color: var(--text-dim); }
+  .deck-note button { margin-left: 4px; padding: 3px 7px; font-size: 9.5px; }
+  .visual[draggable="true"] { cursor: grab; }
+  .visual.dragging { opacity: .45; }
   .panel.system .v { overflow-wrap: anywhere; }
 
   /* Systempanel */
@@ -249,9 +276,6 @@
   }
 
   /* Presentasjonen Eddie bygger: knapper i bunnstripen og en visning over hele siden */
-  .deck-bar { display: flex; gap: 6px; align-items: center; }
-  .deck-bar[hidden] { display: none; }
-  .deck-bar b { font-weight: 500; color: var(--state, var(--cyan)); margin-left: 6px; }
   .deck-view {
     position: fixed; inset: 3vh 3vw; z-index: 20; display: flex; flex-direction: column;
     background: rgba(12, 7, 20, .97); border: 1px solid var(--line); border-top: 2px solid var(--state, var(--cyan));
@@ -290,7 +314,7 @@
 
   /* Bunnstripe: undertekst og demo */
   footer {
-    grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto auto; align-items: end; gap: 16px;
+    grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 16px;
     border-top: 1px solid var(--line); padding-top: 12px;
   }
   .subtitle { min-height: 52px; }
@@ -313,7 +337,7 @@
     body { overflow: auto; }
     .app { height: auto; min-height: 100%; grid-template-columns: 1fr; padding: 14px 16px; }
     .core { height: min(115vw, 620px); order: -1; grid-row: 2; }
-    .panel.system { grid-row: 4; }
+    .side { grid-row: 4; }
     .panel.convo { grid-row: 3; max-height: 60vh; }
     footer { grid-row: 5; grid-template-columns: 1fr; }
     .controls { justify-content: flex-start; }
@@ -336,6 +360,7 @@
     <div class="clock"><div class="time" id="time">--:--:--</div><div class="date" id="date"></div></div>
   </header>
 
+  <div class="side">
   <section class="panel system" aria-label="Systemstatus">
     <h2>SYSTEM <small id="uptime">00:00</small></h2>
     <ul class="status" id="status"></ul>
@@ -346,6 +371,13 @@
       <canvas id="spark" aria-hidden="true"></canvas>
     </div>
   </section>
+
+  <section class="panel decks" aria-label="Presentasjoner">
+    <h2>PRESENTASJONER <small id="deck-total">0</small></h2>
+    <ul class="deck-list" id="deck-list"></ul>
+    <p class="deck-note" id="deck-note">Koble til Eddie for å se presentasjonene.</p>
+  </section>
+  </div>
 
   <section class="core" aria-label="Eddies hjerne: det han er koblet til og vet om">
     <canvas id="hud" aria-hidden="true"></canvas>
@@ -390,10 +422,6 @@
       <button data-state="searching" title="4">Leter</button>
       <button data-state="speaking" title="5">Snakker</button>
       <button class="primary" id="demo" title="D">Kjør demo</button>
-    </div>
-    <div class="deck-bar" id="deck-bar" hidden>
-      <button id="deck-open" title="Se presentasjonen Eddie bygger">Presentasjon<b id="deck-count">0</b></button>
-      <button id="deck-archive" title="Lagrede presentasjoner">Arkiv<b id="deck-saved">0</b></button>
     </div>
   </footer>
   <section class="deck-view" id="deck-view" hidden aria-label="Presentasjon">
@@ -683,6 +711,21 @@ function tile(spec, i) {
   fig.innerHTML = `<div class="vis-head"><h3><span class="vis-no"></span><span></span></h3><small></small></div><div class="vis-body"></div>
     <figcaption class="vis-foot"><span></span> <span class="src"></span></figcaption>`;
   fig.querySelector(".vis-no").textContent = i + 1;  // «ta med graf 2 og 5» viser til disse numrene
+  if (connected) {
+    fig.draggable = true;
+    fig.title = "Dra grafen inn i en presentasjon til venstre";
+    fig.addEventListener("dragstart", e => {
+      e.dataTransfer.setData(DRAG_TYPE, String(i + 1));
+      e.dataTransfer.setData("text/plain", `Graf ${i + 1}`);
+      e.dataTransfer.effectAllowed = "copy";
+      fig.classList.add("dragging");
+      document.body.classList.add("dragging-visual");
+    });
+    fig.addEventListener("dragend", () => {
+      fig.classList.remove("dragging");
+      document.body.classList.remove("dragging-visual");
+    });
+  }
   fig.querySelector(".vis-no").title = `Graf ${i + 1}`;
   fig.querySelector("h3 span:last-child").textContent = (spec.tittel || "").replace(/^\d+\.\s*/, "");
   fig.querySelector("small").textContent = spec.enhet || "";
@@ -1187,7 +1230,7 @@ function connect() {
   ws.onclose = () => {
     if (connected) Eddie.setState("idle");
     controls.classList.remove("hidden");
-    deckUi.bar.hidden = true;
+    clearDecks();
     setChat(false);
     setConnection(false);
     setConversation(false);
@@ -1208,7 +1251,7 @@ function connect() {
       case "activity": Eddie.activity(m.path || []); break;
       case "sources": Eddie.sources(Array.isArray(m.items) ? m.items : [], !!m.pending); break;
       case "visuals": Eddie.visuals(Array.isArray(m.items) ? m.items : []); break;
-      case "deck": updateDeck(m); break;
+      case "decks": renderDecks(Array.isArray(m.items) ? m.items : []); break;
       case "mute": setMuted(!!m.muted); break;
       case "deck_open": openDeckPath(String(m.path || "")); break;
     }
@@ -1219,12 +1262,13 @@ function connect() {
 // Presentasjonsfilene serveres av Eddie selv; fra GitHub Pages må adressen peke til Eddie på denne PC-en.
 const EDDIE_HTTP = WS_URL.replace(/^ws/, "http").replace(/\/ws$/, "/");
 const deckUi = {
-  bar: document.getElementById("deck-bar"), count: document.getElementById("deck-count"),
-  saved: document.getElementById("deck-saved"), view: document.getElementById("deck-view"),
+  list: document.getElementById("deck-list"), total: document.getElementById("deck-total"),
+  note: document.getElementById("deck-note"), view: document.getElementById("deck-view"),
   frame: document.getElementById("deck-frame"), title: document.getElementById("deck-title"),
   newTab: document.getElementById("deck-new-tab"),
 };
-let deckState = { utkast: "presentasjoner/utkast.html", tittel: "Presentasjon", antall: 0, arkiv: [] };
+const DRAG_TYPE = "text/x-eddie-graf";  // dataTransfer-typen for en graf som dras: verdien er nummeret på skjermen
+let decks = [];
 let deckShowing = null;
 
 function openDeck(path, title) {
@@ -1237,22 +1281,70 @@ function openDeck(path, title) {
   deckUi.view.hidden = false;
 }
 function openDeckPath(path) {
-  const saved = (deckState.arkiv || []).find(e => "presentasjoner/" + e.fil === path);
-  openDeck(path, saved ? "Lagret · " + saved.tittel : "Utkast · " + (deckState.tittel || "Presentasjon"));
+  const d = decks.find(e => "presentasjoner/" + e.fil === path);
+  openDeck(path, d ? d.tittel : "Presentasjon");
 }
 function closeDeck() { deckUi.view.hidden = true; deckShowing = null; deckUi.frame.src = "about:blank"; }
-function updateDeck(m) {
-  deckState = { ...deckState, ...m };
-  deckUi.count.textContent = m.antall || 0;
-  deckUi.saved.textContent = (m.arkiv || []).length;
-  deckUi.bar.hidden = false;
-  if (deckShowing === deckState.utkast) {
-    openDeck(deckState.utkast, "Utkast · " + (m.tittel || "Presentasjon"));  // utkastet endret seg mens det vises
+
+function deckMeta(d) {
+  const when = d.endret ? new Date(d.endret).toLocaleDateString("no-NO", { day: "numeric", month: "short" }) : "";
+  const status = d.aktiv ? "<b>Aktiv</b>" : d.ferdig ? "Ferdig" : "Under arbeid";
+  return `${status} · ${d.lysbilder} ${d.lysbilder === 1 ? "lysbilde" : "lysbilder"}${when ? " · " + when : ""}`;
+}
+function dropTarget(li, deckId) {
+  // Slipp en graf her: Eddie legger den inn i presentasjonen (deckId "" = en ny presentasjon).
+  li.addEventListener("dragover", e => {
+    if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    li.classList.add("over");
+  });
+  li.addEventListener("dragleave", () => li.classList.remove("over"));
+  li.addEventListener("drop", e => {
+    e.preventDefault();
+    li.classList.remove("over");
+    const nummer = parseInt(e.dataTransfer.getData(DRAG_TYPE), 10);
+    if (nummer >= 1 && sendCommand({ action: "add_visual", nummer, presentasjon: deckId })) {
+      li.classList.remove("added"); void li.offsetWidth; li.classList.add("added");
+    }
+  });
+}
+function renderDecks(items) {
+  decks = items;
+  deckUi.total.textContent = items.length;
+  const rows = items.map(d => {
+    const li = document.createElement("li");
+    li.innerHTML = `<div class="t"></div><div class="m"></div>`;
+    li.querySelector(".t").textContent = d.tittel || "Uten tittel";
+    li.querySelector(".m").innerHTML = deckMeta(d);  // bare tekst vi lager selv (tall og faste ord)
+    li.title = d.redigerbar ? "Klikk for å se · slipp en graf her for å legge den til" : "Klikk for å se (gammelt format, kan ikke endres)";
+    li.classList.toggle("locked", !d.redigerbar);
+    li.addEventListener("click", () => openDeck("presentasjoner/" + d.fil, d.tittel));
+    if (d.redigerbar) dropTarget(li, d.id);
+    return li;
+  });
+  const fresh = document.createElement("li");
+  fresh.className = "new";
+  fresh.textContent = "+ Slipp en graf her for ny presentasjon";
+  dropTarget(fresh, "");
+  deckUi.list.replaceChildren(...rows, fresh);
+  deckUi.note.innerHTML = "";
+  deckUi.note.append(items.length ? "Dra en graf hit, eller si «ta med graf 2»." : "Ingen presentasjoner ennå.");
+  const archive = document.createElement("button");
+  archive.textContent = "Arkiv";
+  archive.addEventListener("click", () => openDeck("presentasjoner/", "Arkiv"));
+  deckUi.note.append(archive);
+  if (deckShowing) {  // den som vises, kan ha endret seg
+    const shown = items.find(d => "presentasjoner/" + d.fil === deckShowing);
+    if (shown) openDeck(deckShowing, shown.tittel);
   }
 }
-document.getElementById("deck-open").addEventListener("click", () =>
-  openDeck(deckState.utkast, "Utkast · " + deckState.tittel));
-document.getElementById("deck-archive").addEventListener("click", () => openDeck("presentasjoner/", "Arkiv"));
+function clearDecks() {
+  decks = [];
+  deckUi.list.replaceChildren();
+  deckUi.total.textContent = 0;
+  deckUi.note.textContent = "Koble til Eddie for å se presentasjonene.";
+}
 document.getElementById("deck-to-archive").addEventListener("click", () => openDeck("presentasjoner/", "Arkiv"));
 document.getElementById("deck-close").addEventListener("click", closeDeck);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !deckUi.view.hidden) closeDeck(); });
