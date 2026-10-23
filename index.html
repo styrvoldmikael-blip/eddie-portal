@@ -584,6 +584,24 @@
   .note-form .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .primary-btn { background: var(--obos-green); border-color: var(--obos-green); color: #fff; font: 600 13px var(--body); letter-spacing: 0; text-transform: none; border-radius: 8px; }
 
+  /* Tre kolonner som før: prosjekter og samlinger, hjernen, samtalen */
+  .app { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(300px, 380px); }
+  .side { grid-column: 1; grid-row: 2; }
+  .core { grid-column: 2; grid-row: 2; }
+  .panel.convo { grid-column: 3; grid-row: 2; }
+  .panel.hubs { flex: none; max-height: 50%; display: flex; flex-direction: column; }
+  .side-cards { display: grid; gap: 8px; overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--edge) transparent; }
+  .side .pcard { display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 10px; padding: 8px; }
+  .side .pimg { height: 42px; border-radius: 8px; font-size: 18px; }
+  .side .pbody { padding: 0; min-width: 0; } .side .pname { font-size: 14.5px; }
+  .side .pmeta { font-size: 12px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .view.project { grid-column: 1 / 3; grid-row: 2; z-index: 5; min-height: 0; overflow: auto; background: var(--page);
+    border: 1px solid var(--edge); border-radius: 12px; scrollbar-width: thin; scrollbar-color: var(--edge) transparent; }
+  .proj-head { grid-template-columns: 240px minmax(0, 1fr) 200px; }
+  .proj-mid .chips { margin-top: 0; }
+  .ask-hint { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+  .ask-hint b { color: #fff; }
+
   /* Samlinger og Kunnskap som egne sider */
   .view.samlinger { max-width: 760px; margin: 22px auto; } .view.samlinger .panel.decks { min-height: 60vh; }
   .view.core { position: relative; height: 100%; min-height: 520px; }
@@ -594,8 +612,9 @@
   @media (max-width: 1100px) {
     body { overflow: auto; }
     .app { grid-template-columns: 1fr; padding: 0 12px 12px; }
-    .main { grid-row: 2; overflow: visible; } .panel.convo { grid-column: 1; grid-row: 3; max-height: 70vh; } footer { grid-row: 4; }
-    .topbar { grid-template-columns: 1fr auto; } .nav { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; overflow-x: auto; }
+    .core { grid-column: 1; grid-row: 2; height: min(115vw, 620px); } .side { grid-column: 1; grid-row: 3; }
+    .panel.convo { grid-column: 1; grid-row: 4; max-height: 70vh; } footer { grid-row: 5; }
+    .view.project { grid-column: 1; grid-row: 2 / 4; } .topbar { grid-template-columns: 1fr auto; }
     .proj-head, .two { grid-template-columns: 1fr; } .p4grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .hello { font-size: 34px; } .upd { display: none; }
   }
@@ -603,18 +622,14 @@
 </head>
 <body>
 <div class="app">
-  <!-- Toppmeny som i den opprinnelige portalen: merke, navigasjon, system og klokke -->
+  <!-- Toppen: merke, når prosjektene sist ble oppdatert, system og klokke -->
   <header class="topbar">
     <div class="brand">
       <h1>E.D.D.I.E</h1>
       <span class="beta">BETA</span>
       <div class="upd">Oppdatert<b id="updated">–</b></div>
     </div>
-    <nav class="nav" id="nav" aria-label="Hovedmeny">
-      <button data-view="home" class="on">Min hub</button>
-      <button data-view="samlinger">Samlinger</button>
-      <button data-view="kunnskap">Kunnskap</button>
-    </nav>
+    <div></div>
     <div class="head-right">
       <div class="sysmenu" id="sysmenu">
         <button class="sysbtn" id="sysbtn" aria-expanded="false" aria-controls="system-panel" title="Systemstatus">
@@ -634,65 +649,43 @@
     </div>
   </header>
 
-  <main class="main" id="main">
-    <!-- Min hub: hilsen, promptboksen og prosjektene -->
-    <section class="view home" id="view-home" aria-label="Min hub">
-      <div class="home-inner">
-        <h2 class="hello">Hei, Mikael!</h2>
-        <p class="counts" id="home-counts">Kobler til Eddie …</p>
-        <form class="prompt" id="prompt-form" autocomplete="off">
-          <textarea id="prompt-input" rows="2" maxlength="2000" placeholder="Hva vil du gjøre i dag?" aria-label="Spør Eddie"></textarea>
-          <div class="prompt-row">
-            <div class="prompt-left">
-              <span class="orb" aria-hidden="true"></span>
-              <span class="state-lbl" id="state-label" role="status">Standby</span>
-              <span class="prompt-hint">Spør om prosjektene dine · snakk med mikrofonen</span>
-              <span class="sub" id="brain-sub" hidden></span>
-            </div>
-            <div class="prompt-right">
-              <button type="button" class="mute" id="mute" hidden aria-pressed="false" aria-label="Demp Eddies stemme" title="Demp stemmen (Eddie svarer bare med tekst)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="waves" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>
-                  <path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
-              </button>
-              <button type="button" class="mic" id="talk" aria-pressed="false" aria-label="Start samtale" title="Snakk med Eddie">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-                  <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
-              </button>
-              <button type="submit" class="send" aria-label="Send">↑</button>
-            </div>
-          </div>
-        </form>
-        <div class="chips" id="home-chips"></div>
-        <div class="sect"><h3>MINE PROSJEKTER</h3></div>
-        <div class="cards" id="home-projects"><p class="muted">Ingen prosjekter ennå. Lag en mappe i «Prosjekter».</p></div>
-      </div>
+  <div class="side">
+    <section class="panel hubs" aria-label="Prosjekter: én side per prosjekt">
+      <h2>PROSJEKTER <small id="hub-total">0</small></h2>
+      <div class="side-cards" id="home-projects"><p class="muted">Ingen prosjekter ennå. Lag en mappe i «Prosjekter».</p></div>
     </section>
-
-    <!-- Prosjektsiden: som prosjektsidene i den opprinnelige portalen -->
-    <section class="view project" id="view-project" hidden aria-label="Prosjekt"></section>
-
-    <!-- Samlinger: presentasjoner og prosjekter -->
-    <section class="view samlinger" id="view-samlinger" hidden aria-label="Samlinger">
-      <section class="panel decks" aria-label="Samlinger: presentasjoner, prosjekter og annet">
+    <section class="panel decks" aria-label="Samlinger: presentasjoner, prosjekter og annet">
     <h2>SAMLINGER <small id="deck-total">0</small></h2>
     <ul class="deck-list" id="deck-list"></ul>
     <p class="deck-note" id="deck-note">Koble til Eddie for å se samlingene.</p>
   </section>
-    </section>
+  </div>
 
-    <!-- Kunnskap: hjernen, for den som vil se hva Eddie er koblet til -->
-    <section class="view core" id="view-kunnskap" hidden aria-label="Eddies hjerne: det han er koblet til og vet om">
-      <canvas id="hud" aria-hidden="true"></canvas>
-      <div class="tooltip" id="tooltip" role="tooltip"></div>
-      <p class="core-note">Hjernen viser hva Eddie er koblet til og har lært. Når han leter, lyser grenen han leter i.</p>
-    </section>
-
+  <!-- Hjernen: det Eddie er koblet til og vet om. Når han leter, lyser grenen han leter i. -->
+  <section class="core" id="view-kunnskap" aria-label="Eddies hjerne: det han er koblet til og vet om">
+    <canvas id="hud" aria-hidden="true"></canvas>
+    <div class="tooltip" id="tooltip" role="tooltip"></div>
     <div class="visuals" id="visuals" hidden aria-live="polite">
       <div class="vis-grid" id="vis-grid"></div>
       <button class="vis-close" id="vis-close" aria-label="Lukk visningene">✕</button>
     </div>
-  </main>
+    <div class="voice">
+      <button class="mic" id="talk" aria-pressed="false" aria-label="Start samtale">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+      </button>
+      <button class="mute" id="mute" hidden aria-pressed="false" aria-label="Demp Eddies stemme" title="Demp stemmen (Eddie svarer bare med tekst)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="waves" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>
+          <path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+      </button>
+      <div class="lbl" id="state-label" role="status">Standby</div>
+      <div class="sub" id="brain-sub">Klikk for demo</div>
+    </div>
+  </section>
+
+  <!-- Prosjektsiden legger seg over hjernen og prosjektlista; samtalen til høyre står igjen -->
+  <section class="view project" id="view-project" hidden aria-label="Prosjekt"></section>
 
   <section class="panel convo" aria-label="Samtale">
     <h2>SAMTALE <small id="count">0</small></h2>
@@ -1782,15 +1775,13 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && !deckUi.vi
 
 /* ---------- Visninger: Min hub, prosjekt, samlinger, kunnskap ---------- */
 // Som i den opprinnelige portalen: promptboksen og prosjektene først; hjernen ligger under «Kunnskap».
-const views = { home: "view-home", project: "view-project", samlinger: "view-samlinger", kunnskap: "view-kunnskap" };
 let currentView = "home";
 function showView(name) {
+  // Prosjektsiden legger seg over hjernen; samtalen står igjen, så Eddie er med uansett hvor du er.
   currentView = name;
-  for (const [key, id] of Object.entries(views)) document.getElementById(id).hidden = key !== name;
-  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.view === name || (name === "project" && b.dataset.view === "home")));
-  if (name === "kunnskap") resize();  // lerretet hadde ingen størrelse mens det var skjult
+  document.getElementById("view-project").hidden = name !== "project";
+  chatInput.placeholder = !connected ? "Koble til Eddie for å skrive" : name === "project" && hubOpen ? `Spør om ${hubOpen} …` : "Skriv til Eddie …";
 }
-document.querySelectorAll("#nav button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
 
 /* ---------- Prosjekter (projects.py) ---------- */
 let hubs = [], hubOpen = null, projectTab = "oversikt";
@@ -1806,7 +1797,8 @@ function ask(text, project) {
 function renderHubs(items) {
   hubs = items;
   const files = items.reduce((n, h) => n + h.filer.length, 0), analyses = items.reduce((n, h) => n + h.analyser.length, 0);
-  document.getElementById("home-counts").textContent = `${items.length} prosjekter · ${files} filer · ${analyses} analyser`;
+  document.getElementById("hub-total").textContent = items.length;
+  document.getElementById("home-projects").title = `${items.length} prosjekter · ${files} filer · ${analyses} analyser`;
   const latest = items.map(h => h.oppdatert).filter(Boolean).sort().pop();
   document.getElementById("updated").textContent = latest ? new Date(latest).toLocaleString("no-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "–";
   const cards = document.getElementById("home-projects");
@@ -1821,8 +1813,6 @@ function renderHubs(items) {
     card.addEventListener("click", () => openHub(h.navn));
     return card;
   }) : [el("p", { className: "muted", textContent: "Ingen prosjekter ennå. Lag en mappe i «Prosjekter»." })]));
-  document.getElementById("home-chips").replaceChildren(...["Hva haster i dag?", "Hvilke prosjekter trenger oppmerksomhet?", "Lag prosjektstatus for alle prosjektene"]
-    .map(q => el("button", { type: "button", className: "chip-btn", textContent: q, onclick: () => ask(q) })));
   if (hubOpen) { const h = hubs.find(x => x.navn === hubOpen); if (h) renderProject(h); }
 }
 function openHub(name) {
@@ -1926,18 +1916,14 @@ function tabContent(h) {
 function renderProject(h) {
   const v = h.vurdering;
   const worst = v ? (v.fire_p.some(c => c.status === "ikke i rute") ? "ikke i rute" : v.fire_p.some(c => c.status === "følg med") ? "følg med" : "i rute") : null;
-  const input = el("textarea", { rows: 2, maxLength: 2000, placeholder: `Hva vil du vite om ${h.navn}?` });
-  const form = el("form", { className: "prompt small-prompt" }, el("span", { className: "proj-tag", textContent: h.navn }), input,
-    el("div", { className: "prompt-row" }, el("span", { className: "prompt-hint", textContent: `Spør om ${h.navn}` }),
-      el("button", { type: "submit", className: "send", textContent: "↑", ariaLabel: "Send" })));
-  form.addEventListener("submit", e => { e.preventDefault(); if (input.value.trim() && ask(input.value.trim(), h.navn)) input.value = ""; });
-  input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+  // Ingen egen spørreboks: samtalen til høyre vet hvilket prosjekt som er åpent.
+  const hint = el("p", { className: "ask-hint" }, "Spør om ", el("b", { textContent: h.navn }), " i samtalen til høyre, eller velg et forslag.");
   const chips = el("div", { className: "chips" },
     el("button", { type: "button", className: "chip-btn primary", textContent: "Oppdater vurdering", onclick: () => ask(`Oppdater vurdering for ${h.navn}.`, h.navn) }),
     el("button", { type: "button", className: "chip-btn", textContent: "Lag prosjektstatus", onclick: () => ask(`Lag prosjektstatus for ${h.navn}.`, h.navn) }),
     ...h.sporsmal.slice(0, 3).map(q => el("button", { type: "button", className: "chip-btn", textContent: q, onclick: () => ask(q, h.navn) })));
-  const back = el("button", { type: "button", className: "back-btn", textContent: "‹ Tilbake til Min hub", onclick: closeHub });
-  const crumbs = el("div", { className: "crumbs" }, el("a", { href: "#", textContent: "Min hub", onclick: e => { e.preventDefault(); closeHub(); } }), ` / ${h.sted?.split(",").pop().trim() || h.mappe}`);
+  const back = el("button", { type: "button", className: "back-btn", textContent: "‹ Tilbake til hjernen", onclick: closeHub });
+  const crumbs = el("div", { className: "crumbs" }, el("a", { href: "#", textContent: "Prosjekter", onclick: e => { e.preventDefault(); closeHub(); } }), ` / ${h.sted?.split(",").pop().trim() || h.mappe}`);
   const tabs = el("div", { className: "tabs" }, ...[["oversikt", "Oversikt"], ["innsikt", "Innsikt"], ["informasjon", "Informasjon"], ["metoder", "Metoder"]].map(([k, t]) =>
     el("button", { type: "button", className: projectTab === k ? "on" : "", textContent: t, onclick: () => { projectTab = k; renderProject(h); } })));
   const view = document.getElementById("view-project");
@@ -1947,16 +1933,11 @@ function renderProject(h) {
         el("p", { className: "facts", textContent: [h.sted, h.boliger && `${h.boliger} boliger`].filter(Boolean).join(" · ") || h.mappe }),
         v?.tall_per ? el("p", { className: "facts", textContent: `Tall per ${v.tall_per}` }) : null,
         back, el("p", { className: "fetched", textContent: `${h.filer.length} filer · ${h.analyser.length} analyser · ${h.kilder.length} kilder` })),
-      el("div", { className: "proj-mid" }, form, chips),
+      el("div", { className: "proj-mid" }, chips, hint),
       el("div", { className: "proj-right" }, el("h4", { textContent: "NESTE MØTE" }), el("p", { className: "muted", textContent: h.neste_mote || `Ingen møte registrert. Legg det inn som «neste_mote» i prosjekt.md.` }))),
     tabs, el("div", { className: "tab-body" }, ...tabContent(h))));
 }
 document.addEventListener("keydown", e => { if (e.key === "Escape" && currentView === "project" && deckUi.view.hidden) closeHub(); });
-
-/* Promptboksen på Min hub: det du skriver går til Eddie, og svaret kommer i samtalen til høyre */
-const promptForm = document.getElementById("prompt-form"), promptInput = document.getElementById("prompt-input");
-promptForm.addEventListener("submit", e => { e.preventDefault(); if (promptInput.value.trim() && ask(promptInput.value.trim())) promptInput.value = ""; });
-promptInput.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); promptForm.requestSubmit(); } });
 
 /* ---------- Stemmeknappen og chatten ---------- */
 const talkBtn = document.getElementById("talk");
@@ -1997,14 +1978,15 @@ muteBtn.addEventListener("click", () => sendCommand({ action: muted ? "unmute" :
 function setChat(enabled) {
   muteBtn.hidden = !enabled;  // bare når den ekte Eddie er tilkoblet
   chatInput.disabled = chatSend.disabled = !enabled;
-  chatInput.placeholder = enabled ? "Skriv til Eddie …" : "Koble til Eddie for å skrive";
+  chatInput.placeholder = !enabled ? "Koble til Eddie for å skrive" : currentView === "project" && hubOpen ? `Spør om ${hubOpen} …` : "Skriv til Eddie …";
 }
 talkBtn.addEventListener("click", toggleTalk);
 chatForm.addEventListener("submit", e => {
   e.preventDefault();
   const text = chatInput.value.trim();
   // Meldingen vises i samtalen når Eddie sender den tilbake («user»), så den bare står der én gang.
-  if (text && sendCommand({ action: "message", text })) chatInput.value = "";
+  // Står et prosjekt åpent, gjelder spørsmålet det prosjektet.
+  if (text && ask(text, currentView === "project" ? hubOpen : null)) chatInput.value = "";
 });
 setConnection(false);
 connect();
