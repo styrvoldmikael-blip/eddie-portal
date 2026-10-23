@@ -38,8 +38,8 @@
   Kommandoer til Eddie:
     {"type": "command", "action": "talk" | "stop" | "mute" | "unmute"}
     {"type": "command", "action": "message", "text": "..."}  skrevet melding fra chatten (maks 2000 tegn)
-    {"type": "command", "action": "add_visual", "nummer": 2, "presentasjon": "<id>" | ""}
-                                                             dra-og-slipp: graf 2 inn i en presentasjon ("" = ny)
+    {"type": "command", "action": "add_visual", "nummer": 2, "presentasjon": "<id>" | "", "kind": "prosjekt"}
+                                                             dra-og-slipp: graf 2 inn i en samling ("" = ny av typen kind)
 -->
 <style>
   :root {
@@ -98,7 +98,19 @@
     margin: 0; font-family: var(--head); font-weight: 700; font-size: 26px; letter-spacing: .32em;
     color: #f3e8ff; text-shadow: 0 0 14px var(--state, var(--cyan));
   }
-  .brand span { color: var(--text-dim); letter-spacing: .2em; font-size: 13px; text-transform: uppercase; }
+  .head-right { display: flex; align-items: center; gap: 22px; }
+
+  /* System: en knapp i toppen med samlet status; panelet åpnes som nedtrekksmeny */
+  .sysmenu { position: relative; }
+  .sysbtn { display: flex; align-items: center; gap: 9px; }
+  .sysbtn .dot { margin-top: 0; }
+  .sysbtn::after { content: "▾"; color: var(--text-dim); transition: transform .2s; }
+  .sysmenu.open .sysbtn::after { transform: rotate(180deg); }
+  .sysmenu .panel.system {
+    position: absolute; right: 0; top: calc(100% + 10px); width: 320px; max-height: 70vh; z-index: 30;
+    overflow: hidden auto; display: none; background: rgba(14, 8, 22, .97); box-shadow: 0 16px 50px rgba(0, 0, 0, .6);
+  }
+  .sysmenu.open .panel.system { display: flex; }
   .clock { text-align: right; font-family: var(--head); }
   .clock .time { font-size: 22px; letter-spacing: .12em; color: #f3e8ff; }
   .clock .date { font-family: var(--body); font-size: 13px; letter-spacing: .18em; color: var(--text-dim); text-transform: uppercase; }
@@ -131,8 +143,13 @@
 
   /* Venstre kolonne: System øverst, Presentasjoner under */
   .side { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
-  .panel.system { flex: 0 1 auto; min-height: 0; overflow: hidden auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .panel.system { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .panel.decks { flex: 1 1 auto; min-height: 150px; }
+  .deck-group { list-style: none; margin: 10px 0 2px; font-family: var(--mono); font-size: 10px; letter-spacing: .24em;
+    text-transform: uppercase; color: var(--state, var(--cyan)); display: flex; justify-content: space-between; }
+  .deck-group:first-child { margin-top: 0; }
+  .deck-list li.deck-group, .deck-list li.deck-group:hover { border: 0; background: none; padding: 0; cursor: default; box-shadow: none; }
+  .deck-group small { color: var(--text-dim); letter-spacing: .1em; }
   .deck-list { list-style: none; margin: 0; padding: 0 4px 0 0; display: grid; gap: 6px; align-content: start;
     overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .deck-list li {
@@ -147,7 +164,7 @@
     letter-spacing: .14em; text-transform: uppercase; text-align: center; cursor: default; }
   .deck-list li.locked { opacity: .65; }
   /* Mens en graf dras: presentasjonene som kan ta imot den, lyser opp */
-  body.dragging-visual .deck-list li:not(.locked) { border-color: var(--state, var(--cyan)); border-style: dashed; }
+  body.dragging-visual .deck-list li:not(.locked):not(.deck-group) { border-color: var(--state, var(--cyan)); border-style: dashed; }
   .deck-list li.over { background: rgba(240, 171, 252, .16); box-shadow: 0 0 14px rgba(240, 171, 252, .3); }
   .deck-list li.added { animation: added .9s ease-out; }
   @keyframes added { 0% { background: rgba(87, 255, 176, .3); } }
@@ -328,7 +345,7 @@
     .panel.convo { grid-row: 3; max-height: 60vh; }
     footer { grid-row: 5; grid-template-columns: 1fr; }
     .controls { justify-content: flex-start; }
-    .brand span { display: none; }
+    .sysmenu .panel.system { width: min(320px, 90vw); }
     .voice { bottom: 2%; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -341,13 +358,12 @@
   <header>
     <div class="brand">
       <h1>E.D.D.I.E</h1>
-      <span>Personlig assistent · Mikael</span>
     </div>
-    <div class="clock"><div class="time" id="time">--:--:--</div><div class="date" id="date"></div></div>
-  </header>
-
-  <div class="side">
-  <section class="panel system" aria-label="Systemstatus">
+    <div class="head-right">
+      <div class="sysmenu" id="sysmenu">
+        <button class="sysbtn" id="sysbtn" aria-expanded="false" aria-controls="system-panel" title="Systemstatus">
+          <span class="dot" id="sys-dot"></span>System</button>
+        <section class="panel system" id="system-panel" aria-label="Systemstatus">
     <h2>SYSTEM <small id="uptime">00:00</small></h2>
     <ul class="status" id="status"></ul>
     <div class="metric">
@@ -357,11 +373,17 @@
       <canvas id="spark" aria-hidden="true"></canvas>
     </div>
   </section>
+      </div>
+      <div class="clock"><div class="time" id="time">--:--:--</div><div class="date" id="date"></div></div>
+    </div>
+  </header>
 
-  <section class="panel decks" aria-label="Presentasjoner">
-    <h2>PRESENTASJONER <small id="deck-total">0</small></h2>
+  <div class="side">
+
+  <section class="panel decks" aria-label="Samlinger: presentasjoner, prosjekter og annet">
+    <h2>SAMLINGER <small id="deck-total">0</small></h2>
     <ul class="deck-list" id="deck-list"></ul>
-    <p class="deck-note" id="deck-note">Koble til Eddie for å se presentasjonene.</p>
+    <p class="deck-note" id="deck-note">Koble til Eddie for å se samlingene.</p>
   </section>
   </div>
 
@@ -507,6 +529,7 @@ const Eddie = {
     li.querySelector(".k").textContent = STATUS_LABELS[key] || key;
     li.querySelector(".v").textContent = value;
     li.querySelector(".dot").className = "dot " + (ok === true ? "ok" : ok === false ? "err" : "warn");
+    updateSystemDot();
   },
   latency(seconds, stt, brain) {
     S.latencies.push(seconds);
@@ -737,6 +760,24 @@ window.addEventListener("resize", () => {
   resizeTimer = setTimeout(() => { if (shownVisuals.length) showVisuals(shownVisuals); }, 120);
 });
 document.getElementById("vis-close").addEventListener("click", hideVisuals);
+
+/* ---------- System som nedtrekksmeny ---------- */
+const sysmenu = document.getElementById("sysmenu");
+const sysbtn = document.getElementById("sysbtn");
+function toggleSystem(open = !sysmenu.classList.contains("open")) {
+  sysmenu.classList.toggle("open", open);
+  sysbtn.setAttribute("aria-expanded", String(open));
+  if (open) drawSpark();  // grafen tegnes i den bredden den har, og den var skjult
+}
+sysbtn.addEventListener("click", e => { e.stopPropagation(); toggleSystem(); });
+document.addEventListener("click", e => { if (!sysmenu.contains(e.target)) toggleSystem(false); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") toggleSystem(false); });
+function updateSystemDot() {
+  // Knappen viser det verste: rød hvis noe er feil, gul hvis noe bør sjekkes, ellers grønn.
+  const dots = [...ui.status.querySelectorAll(".dot")];
+  const worst = dots.some(d => d.classList.contains("err")) ? "err" : dots.some(d => d.classList.contains("warn")) ? "warn" : "ok";
+  document.getElementById("sys-dot").className = "dot " + worst;
+}
 
 /* ---------- Klokke ---------- */
 const started = Date.now();
@@ -1289,8 +1330,10 @@ function deckMeta(d) {
   const status = d.aktiv ? "<b>Aktiv</b>" : d.ferdig ? "Ferdig" : "Under arbeid";
   return `${status} · ${d.lysbilder} ${d.lysbilder === 1 ? "lysbilde" : "lysbilder"}${when ? " · " + when : ""}`;
 }
-function dropTarget(li, deckId) {
-  // Slipp en graf her: Eddie legger den inn i presentasjonen (deckId "" = en ny presentasjon).
+const KIND_TITLES = { presentasjon: "Presentasjoner", prosjekt: "Prosjekter" };
+const KIND_NEW = { presentasjon: "ny presentasjon", prosjekt: "nytt prosjekt" };
+function dropTarget(li, deckId, kind = "presentasjon") {
+  // Slipp en graf her: Eddie legger den inn i samlingen (deckId "" = en ny samling av typen kind).
   li.addEventListener("dragover", e => {
     if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
     e.preventDefault();
@@ -1302,7 +1345,7 @@ function dropTarget(li, deckId) {
     e.preventDefault();
     li.classList.remove("over");
     const nummer = parseInt(e.dataTransfer.getData(DRAG_TYPE), 10);
-    if (nummer >= 1 && sendCommand({ action: "add_visual", nummer, presentasjon: deckId })) {
+    if (nummer >= 1 && sendCommand({ action: "add_visual", nummer, presentasjon: deckId, kind })) {
       li.classList.remove("added"); void li.offsetWidth; li.classList.add("added");
     }
   });
@@ -1310,7 +1353,7 @@ function dropTarget(li, deckId) {
 function renderDecks(items) {
   decks = items;
   deckUi.total.textContent = items.length;
-  const rows = items.map(d => {
+  const row = d => {
     const li = document.createElement("li");
     li.innerHTML = `<div class="t"></div><div class="m"></div>`;
     li.querySelector(".t").textContent = d.tittel || "Uten tittel";
@@ -1318,16 +1361,28 @@ function renderDecks(items) {
     li.title = d.redigerbar ? "Klikk for å se · slipp en graf her for å legge den til" : "Klikk for å se (gammelt format, kan ikke endres)";
     li.classList.toggle("locked", !d.redigerbar);
     li.addEventListener("click", () => openDeck("presentasjoner/" + d.fil, d.tittel));
-    if (d.redigerbar) dropTarget(li, d.id);
+    if (d.redigerbar) dropTarget(li, d.id, d.type);
     return li;
-  });
-  const fresh = document.createElement("li");
-  fresh.className = "new";
-  fresh.textContent = "+ Slipp en graf her for ny presentasjon";
-  dropTarget(fresh, "");
-  deckUi.list.replaceChildren(...rows, fresh);
+  };
+  // Én gruppe per type: presentasjoner og prosjekter alltid, andre typer når de finnes. Hver med sin «+ ny».
+  const kinds = [...new Set(["presentasjon", "prosjekt", ...items.map(d => d.type || "presentasjon")])];
+  const nodes = [];
+  for (const kind of kinds) {
+    const mine = items.filter(d => (d.type || "presentasjon") === kind);
+    const head = document.createElement("li");
+    head.className = "deck-group";
+    head.innerHTML = "<span></span><small></small>";
+    head.querySelector("span").textContent = KIND_TITLES[kind] || kind;
+    head.querySelector("small").textContent = mine.length;
+    const fresh = document.createElement("li");
+    fresh.className = "new";
+    fresh.textContent = "+ Slipp en graf her for " + (KIND_NEW[kind] || "ny: " + kind);
+    dropTarget(fresh, "", kind);
+    nodes.push(head, ...mine.map(row), fresh);
+  }
+  deckUi.list.replaceChildren(...nodes);
   deckUi.note.innerHTML = "";
-  deckUi.note.append(items.length ? "Dra en graf hit, eller si «ta med graf 2»." : "Ingen presentasjoner ennå.");
+  deckUi.note.append(items.length ? "Dra en graf hit, eller si «ta med graf 2 i Frysja-prosjektet»." : "Ingen samlinger ennå.");
   const archive = document.createElement("button");
   archive.textContent = "Arkiv";
   archive.addEventListener("click", () => openDeck("presentasjoner/", "Arkiv"));
@@ -1341,7 +1396,7 @@ function clearDecks() {
   decks = [];
   deckUi.list.replaceChildren();
   deckUi.total.textContent = 0;
-  deckUi.note.textContent = "Koble til Eddie for å se presentasjonene.";
+  deckUi.note.textContent = "Koble til Eddie for å se samlingene.";
 }
 document.getElementById("deck-to-archive").addEventListener("click", () => openDeck("presentasjoner/", "Arkiv"));
 document.getElementById("deck-close").addEventListener("click", closeDeck);
