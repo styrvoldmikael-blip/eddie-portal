@@ -301,6 +301,7 @@
   .deck-view .actions { display: flex; gap: 6px; }
   .deck-view a.btn { font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: #e9d5ff;
     border: 1px solid var(--line); padding: 8px 10px; text-decoration: none; }
+  .deck-view a.btn[hidden] { display: none; }
   .deck-view a.btn:hover { background: rgba(240,171,252,.12); color: #fff; }
   .deck-view iframe { flex: 1; width: 100%; border: 0; background: #ebe8f1; }
 
@@ -442,6 +443,7 @@
   <section class="deck-view" id="deck-view" hidden aria-label="Presentasjon">
     <header><h3 id="deck-title">Presentasjon</h3>
       <div class="actions"><a class="btn" id="deck-new-tab" target="_blank" rel="noopener">Åpne i ny fane</a>
+        <a class="btn" id="deck-pdf" target="_blank" rel="noopener" hidden>PDF</a>
         <button id="deck-to-archive">Arkiv</button><button id="deck-close" aria-label="Lukk presentasjonen">✕</button></div></header>
     <iframe id="deck-frame" title="Presentasjon"></iframe>
   </section>
@@ -1333,6 +1335,11 @@ function openDeck(path, title) {
   deckShowing = path;
   deckUi.title.textContent = title;
   deckUi.newTab.href = url;
+  // PDF-en lages i bakgrunnen etter hver endring; knappen vises når den finnes.
+  const entry = decks.find(d => "presentasjoner/" + d.fil === path);
+  const pdfLink = document.getElementById("deck-pdf");
+  pdfLink.hidden = !entry?.pdf;
+  if (entry?.pdf) pdfLink.href = url.replace(/\.html$/, ".pdf");
   deckUi.frame.src = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();  // alltid nyeste versjon
   deckUi.view.hidden = false;
 }
