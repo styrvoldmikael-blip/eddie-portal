@@ -26,7 +26,9 @@
     {"type": "activity", "path": ["eddie", "connector:ssb", …], "tool": "mcp__ssb__boligpriser"}
                                                              hvor i hjernen Eddie leter akkurat nå
     {"type": "sources", "items": [{kind, title, url, query?}], "pending": true}
-                                                             kildene til svaret (sources.py); vises under svaret når pending=false
+                                                             kildene til svaret (sources.py); vises under svaret når pending=false,
+                                                             med «calcs»: utregningene (lesbare linjer) bak svaret
+                                                             url «kilde/<id>»: en fil Eddie leste, åpnes fra Eddie
     {"type": "visuals", "items": [{"kind": "linje" | "stolpe" | "tabell", "tittel", "enhet", "kategorier": [...],
      "serier": [{navn, verdier}], "kilde", "kommentar"}, …]}  grafene og tabellene Eddie viser nå (connectors/visning.py),
                                                              lagt i et rutenett: 1, 2 side om side, 2×2 eller 3×3,
@@ -286,6 +288,29 @@
     font-size: 12px; font-weight: 600; color: #fff; background: var(--green); vertical-align: 2px;
   }
   .vis-close { background: #fff; color: #002169; border-color: #E6E6E6; }
+
+  /* «Slik er det laget»: hva grafen betyr, utregningen og kildene, bare når noen vil vite mer */
+  .visual { position: relative; }
+  .vis-how { font: 600 11px "Segoe UI", Arial, sans-serif; letter-spacing: .02em; text-transform: none; color: var(--green);
+    background: none; border: 0; padding: 0; margin-top: 4px; cursor: pointer; }
+  .vis-how:hover { background: none; box-shadow: none; color: var(--navy); text-decoration: underline; }
+  .vis-details { position: absolute; inset: 0; z-index: 2; background: #fff; overflow: auto; padding: 14px 16px 12px;
+    border-radius: 4px; color: var(--ink); font-size: 13.5px; line-height: 1.45; }
+  .vis-details[hidden] { display: none; }
+  .vis-details h4 { margin: 12px 0 4px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--green); }
+  .vis-details h4:first-of-type { margin-top: 6px; }
+  .vis-details ul { margin: 0; padding-left: 18px; }
+  .vis-details li { margin: 2px 0; font-variant-numeric: tabular-nums; }
+  .vis-details a { color: var(--blue, #0047BA); }
+  .vis-details .back { float: right; }
+  .vis-details .back, .vis-details .back:hover { font: 600 11px "Segoe UI", Arial, sans-serif; color: var(--navy); background: #fff;
+    border: 1px solid var(--rule); padding: 3px 8px; letter-spacing: 0; text-transform: none; box-shadow: none; }
+
+  /* Under svaret i samtalen: utregningene, sammenfoldet */
+  .msg-calc { margin-top: 6px; font-size: 13px; color: var(--text-dim); }
+  .msg-calc summary { cursor: pointer; font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+  .msg-calc ul { margin: 4px 0 0; padding-left: 18px; }
+  .msg-calc li { font-variant-numeric: tabular-nums; }
   .vis-close:hover { background: #F2F2F2; color: #002169; box-shadow: none; }
 
   /* Presentasjonen Eddie bygger: knapper i bunnstripen og en visning over hele siden */
@@ -555,13 +580,23 @@ const Eddie = {
   },
   graph(snapshot, replace = false) { mergeGraph(snapshot, replace); },
   visuals(items) { showVisuals(items); },
-  sources(items, pending) {
-    if (pending || !items.length || !S.lastEddie) return;
+  sources(items, pending, calcs = []) {
+    if (pending || !S.lastEddie || (!items.length && !calcs.length)) return;
     S.lastEddie.querySelector(".msg-src")?.remove();
-    const box = document.createElement("div");
-    box.className = "msg-src";
-    box.append(...items.map(sourceItem));
-    S.lastEddie.append(box);
+    S.lastEddie.querySelector(".msg-calc")?.remove();
+    if (items.length) {
+      const box = document.createElement("div");
+      box.className = "msg-src";
+      box.append(...items.map(sourceItem));
+      S.lastEddie.append(box);
+    }
+    if (calcs.length) {
+      const calc = document.createElement("details");
+      calc.className = "msg-calc";
+      calc.innerHTML = "<summary>Slik er det regnet</summary><ul></ul>";
+      calc.querySelector("ul").append(...calcs.map(line => Object.assign(document.createElement("li"), { textContent: line })));
+      S.lastEddie.append(calc);
+    }
     scrollLog();
   },
   activity(path) {
@@ -577,15 +612,22 @@ const STATUS_LABELS = {
   brain: "Hjerne", stt: "Tale → tekst", tts: "Stemme", mic: "Mikrofon", link: "Tilkobling", web: "Nettsøk", methods: "Metoder", lang: "Norsk tekst",
 };
 
+function sourceHref(url) {
+  // Nettadresser som de er; «kilde/<id>» er en fil Eddie har lest (dokument eller metode), som Eddie viser.
+  if (/^https?:\/\//i.test(url || "")) return url;
+  if (/^kilde\/[0-9a-f]{12}$/.test(url || "")) return EDDIE_HTTP + url;
+  return null;
+}
 function sourceItem(src) {
-  // Bare vanlige nettadresser blir lenker; alt annet (minner, rare verdier) vises som tekst.
-  const safe = /^https?:\/\//i.test(src.url || "");
+  // Bare nettadresser og Eddies egne kildelenker blir lenker; alt annet (minner, rare verdier) vises som tekst.
+  const href = sourceHref(src.url);
+  const safe = !!href;
   const el = document.createElement(safe ? "a" : "span");
   const kind = document.createElement("b");
   kind.textContent = src.kind || "Kilde";
   el.append(kind, src.title || src.url || "");
   el.title = [src.title, src.query && "søk: " + src.query, src.url].filter(Boolean).join("\n");
-  if (safe) { el.href = src.url; el.target = "_blank"; el.rel = "noopener noreferrer"; }
+  if (safe) { el.href = href; el.target = "_blank"; el.rel = "noopener noreferrer"; }
   return el;
 }
 
@@ -755,7 +797,41 @@ function tile(spec, i) {
   fig.querySelector(".vis-foot span").textContent = spec.kommentar || "";
   const src = fig.querySelector(".vis-foot .src");
   if (spec.kilde) { src.innerHTML = SOURCE_ICON; src.append("Kilde: " + spec.kilde); }
+  addDetails(fig, spec);
   return fig;
+}
+
+/* «Slik er det laget»: hva grafen betyr, utregningene og kildene, lagt over grafen når noen klikker. */
+function addDetails(fig, spec) {
+  const d = spec.detaljer || {}, calcs = d.utregninger || [], sources = d.kilder || [];
+  if (!spec.betydning && !calcs.length && !sources.length && !spec.kilde) return;
+  const how = document.createElement("button");
+  how.className = "vis-how";
+  how.textContent = "Slik er det laget";
+  const panel = document.createElement("div");
+  panel.className = "vis-details";
+  panel.hidden = true;
+  const back = Object.assign(document.createElement("button"), { className: "back", textContent: "Tilbake til grafen" });
+  panel.append(back);
+  const section = (title, nodes) => {
+    if (!nodes.length) return;
+    panel.append(Object.assign(document.createElement("h4"), { textContent: title }));
+    const ul = document.createElement("ul");
+    ul.append(...nodes.map(n => { const li = document.createElement("li"); li.append(n); return li; }));
+    panel.append(ul);
+  };
+  if (spec.betydning) {
+    panel.append(Object.assign(document.createElement("h4"), { textContent: "Hva det betyr" }));
+    panel.append(Object.assign(document.createElement("p"), { textContent: spec.betydning, style: "margin:0" }));
+  }
+  section("Slik er det regnet", calcs.map(line => line));
+  const sourceNodes = sources.map(sourceItem);
+  if (spec.kilde && !sources.some(x => (x.title || "").includes(spec.kilde))) sourceNodes.unshift(spec.kilde);
+  section("Kilder", sourceNodes);
+  how.addEventListener("click", e => { e.stopPropagation(); panel.hidden = false; });
+  back.addEventListener("click", e => { e.stopPropagation(); panel.hidden = true; });
+  fig.querySelector(".vis-head").append(how);
+  fig.append(panel);
 }
 function showVisuals(items) {
   shownVisuals = (items || []).filter(v => Array.isArray(v?.kategorier) && Array.isArray(v?.serier)).slice(-9);
@@ -1307,7 +1383,7 @@ function connect() {
       case "conversation": setConversation(!!m.active); break;
       case "graph": Eddie.graph(m, !realGraph); realGraph = true; break;
       case "activity": Eddie.activity(m.path || []); break;
-      case "sources": Eddie.sources(Array.isArray(m.items) ? m.items : [], !!m.pending); break;
+      case "sources": Eddie.sources(Array.isArray(m.items) ? m.items : [], !!m.pending, Array.isArray(m.calcs) ? m.calcs : []); break;
       case "visuals": Eddie.visuals(Array.isArray(m.items) ? m.items : []); break;
       case "decks": renderDecks(Array.isArray(m.items) ? m.items : []); break;
       case "mute": setMuted(!!m.muted); break;
