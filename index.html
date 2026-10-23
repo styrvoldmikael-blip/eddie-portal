@@ -249,35 +249,44 @@
   .visuals.multi { height: calc(100% - 170px); }
   .visuals[hidden] { display: none; }
   .vis-grid { flex: 1; min-width: 0; display: grid; gap: 10px; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
-  .vis-close { position: absolute; top: -2px; right: -2px; z-index: 3; padding: 3px 8px; font-size: 13px; letter-spacing: 0; background: rgba(12, 7, 20, .95); }
+  .vis-close { position: absolute; top: -2px; right: -2px; z-index: 3; padding: 3px 8px; font-size: 13px; letter-spacing: 0; }
+  /* Grafene følger OBOS Grunnmuren, som presentasjonene: hvite kort med tynn ramme, marineblå tittel, grønn etikett,
+     grå tekst. Samme seriefarger som connectors/presentasjon.py, så en graf ser lik ut i portalen og i presentasjonen. */
   .visual {
+    --navy: #002169; --green: #008761; --ink: #1f1f1f; --dim: #595959; --rule: #E6E6E6; --red: #C0385D;
     min-width: 0; min-height: 0; margin: 0; display: flex; flex-direction: column; padding: 12px 16px 10px;
-    background: rgba(12, 7, 20, .9); border: 1px solid var(--line); border-top: 2px solid var(--state, var(--cyan));
-    box-shadow: 0 10px 40px rgba(0, 0, 0, .5); backdrop-filter: blur(4px); animation: fadein .4s ease-out;
+    background: #fff; border: 1px solid var(--rule); border-radius: 4px; color: var(--ink);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .45); animation: fadein .4s ease-out;
+    font-family: "Segoe UI", Arial, system-ui, sans-serif;
   }
   .vis-head { padding-right: 28px; }
-  .vis-head h3 { margin: 0; font-family: var(--body); font-weight: 600; font-size: 19px; color: #f3e8ff; letter-spacing: .02em; }
-  .multi .vis-head h3 { font-size: 16px; }
-  .vis-head small { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--text-dim); text-transform: uppercase; margin-top: 2px; }
-  .vis-body { flex: 1; min-height: 0; overflow: auto; margin-top: 8px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-  .vis-body svg { width: 100%; height: auto; display: block; font-family: var(--mono); }
-  .vis-body svg text { fill: var(--text-dim); font-size: 11px; }
-  .vis-body svg .grid { stroke: rgba(220, 160, 255, .1); }
-  .vis-body svg .axis { stroke: rgba(220, 160, 255, .3); }
-  .vis-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 14px; color: var(--text); }
-  .vis-legend i { display: inline-block; width: 12px; height: 3px; margin-right: 7px; vertical-align: middle; }
-  .vis-foot { margin-top: 6px; font-size: 13px; color: var(--text-dim); }
-  .vis-foot .src { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; }
-  .vis-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-  .vis-table th, .vis-table td { padding: 5px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  .vis-head h3 { margin: 0; font-weight: 700; font-size: 18px; color: var(--navy); line-height: 1.25; }
+  .multi .vis-head h3 { font-size: 15px; }
+  .vis-head small { display: block; font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .vis-body { flex: 1; min-height: 0; overflow: auto; margin-top: 8px; scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+  .vis-body svg { width: 100%; height: auto; display: block; font-family: "Segoe UI", Arial, system-ui, sans-serif; }
+  .vis-body svg text { fill: var(--dim); font-size: 11px; }
+  .vis-body svg .grid { stroke: var(--rule); }
+  .vis-body svg .axis { stroke: var(--dim); }
+  .vis-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 13px; color: var(--dim); }
+  .vis-legend i { display: inline-block; width: 12px; height: 4px; border-radius: 2px; margin-right: 7px; vertical-align: middle; }
+  .vis-foot { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--dim);
+    display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; }
+  .vis-foot .src { display: inline-flex; align-items: center; gap: 5px; }
+  .vis-foot .src svg { width: 13px; height: 13px; flex: none; }
+  .vis-table { width: 100%; border-collapse: collapse; font-size: 14px; color: var(--ink); }
+  .vis-table th, .vis-table td { padding: 5px 10px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
   .vis-table th:first-child, .vis-table td:first-child { text-align: left; }
-  .vis-table th { font-family: var(--mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--state, var(--cyan)); font-weight: 500; }
+  .vis-table th { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--green); font-weight: 600; }
   .vis-table td { font-variant-numeric: tabular-nums; }
+  .vis-table td.neg { color: var(--red); }
 
   .vis-no {
-    display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; margin-right: 9px;
-    font-family: var(--mono); font-size: 12px; color: #0c0714; background: var(--state, var(--cyan)); vertical-align: 2px;
+    display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; margin-right: 9px; border-radius: 2px;
+    font-size: 12px; font-weight: 600; color: #fff; background: var(--green); vertical-align: 2px;
   }
+  .vis-close { background: #fff; color: #002169; border-color: #E6E6E6; }
+  .vis-close:hover { background: #F2F2F2; color: #002169; box-shadow: none; }
 
   /* Presentasjonen Eddie bygger: knapper i bunnstripen og en visning over hele siden */
   .deck-view {
@@ -599,7 +608,11 @@ function lastSentence(text) {
 }
 
 /* ---------- Grafer og tabeller (connectors/visning.py) ---------- */
-const VIS_COLORS = ["#f0abfc", "#4fd8ff", "#ffb547", "#57ffb0", "#c4b5fd", "#fb7185", "#fde047", "#93c5fd"];
+// OBOS Grunnmuren: grønn hovedserie, så blå, marineblå, grå og lyse varianter. Rødt bare for negative verdier.
+const VIS_COLORS = ["#008761", "#0047BA", "#002169", "#595959", "#7FBFD6", "#6CC2A3"];
+const VIS_NEGATIVE = "#C0385D";
+const SOURCE_ICON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">' +
+  '<path d="M4 1.5h5.5L12.5 4.5v10h-8.5z"/><path d="M9.5 1.5v3h3M6 8h4.5M6 10.5h4.5"/></svg>';
 const SVG_NS = "http://www.w3.org/2000/svg";
 const numFmt = new Intl.NumberFormat("no-NO", { maximumFractionDigits: 1 });
 const visEl = document.getElementById("visuals");
@@ -662,18 +675,17 @@ function chartSvg(spec, body, fill) {
         if (v == null) return;
         const x0 = L + band * i + (band - inner) / 2 + w * si, base = y(Math.max(lo, 0));
         const rect = svgEl("rect", { x: x0 + 1, width: Math.max(1, w - 2), y: Math.min(y(v), base),
-          height: Math.max(1, Math.abs(base - y(v))), fill: color, opacity: 0.85 });
+          height: Math.max(1, Math.abs(base - y(v))), fill: v < 0 ? VIS_NEGATIVE : color });
         rect.append(svgEl("title", {}, `${s.navn} · ${cats[i]}: ${numFmt.format(v)} ${spec.enhet || ""}`));
         svg.append(rect);
       });
     } else {
       let d = "";
       s.verdier.forEach((v, i) => { if (v != null) d += `${d && s.verdier[i - 1] != null ? "L" : "M"}${x(i)},${y(v)}`; });
-      svg.append(svgEl("path", { d, fill: "none", stroke: color, "stroke-width": 2.5, "stroke-linejoin": "round",
-        style: `filter: drop-shadow(0 0 4px ${color}66)` }));
+      svg.append(svgEl("path", { d, fill: "none", stroke: color, "stroke-width": 2.5, "stroke-linejoin": "round" }));
       s.verdier.forEach((v, i) => {
         if (v == null) return;
-        const dot = svgEl("circle", { cx: x(i), cy: y(v), r: cats.length > 30 ? 2 : 4, fill: "#0c0714", stroke: color, "stroke-width": 2 });
+        const dot = svgEl("circle", { cx: x(i), cy: y(v), r: cats.length > 30 ? 2 : 4, fill: "#fff", stroke: color, "stroke-width": 2 });
         dot.append(svgEl("title", {}, `${s.navn} · ${cats[i]}: ${numFmt.format(v)} ${spec.enhet || ""}`));
         svg.append(dot);
       });
@@ -691,7 +703,11 @@ function tableEl(spec) {
   spec.kategorier.forEach((c, i) => {
     const row = body.insertRow();
     row.insertCell().textContent = c;
-    for (const s of spec.serier) row.insertCell().textContent = s.verdier[i] == null ? "–" : numFmt.format(s.verdier[i]);
+    for (const s of spec.serier) {
+      const cell = row.insertCell(), v = s.verdier[i];
+      cell.textContent = v == null ? "–" : numFmt.format(v);
+      if (v < 0) cell.className = "neg";
+    }
   });
   return table;
 }
@@ -735,7 +751,8 @@ function tile(spec, i) {
   fig.querySelector("small").textContent = spec.enhet || "";
   fig.querySelector(".vis-body").after(legendEl(spec));
   fig.querySelector(".vis-foot span").textContent = spec.kommentar || "";
-  fig.querySelector(".vis-foot .src").textContent = spec.kilde ? "Kilde: " + spec.kilde : "";
+  const src = fig.querySelector(".vis-foot .src");
+  if (spec.kilde) { src.innerHTML = SOURCE_ICON; src.append("Kilde: " + spec.kilde); }
   return fig;
 }
 function showVisuals(items) {
