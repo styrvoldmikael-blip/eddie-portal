@@ -33,7 +33,8 @@
      "serier": [{navn, verdier}], "kilde", "kommentar"}, …]}  grafene og tabellene Eddie viser nå (connectors/visning.py),
                                                              lagt i et rutenett: 1, 2 side om side, 2×2 eller 3×3,
                                                              og nummerert 1, 2, 3 … så Mikael kan si «ta med graf 2»
-    {"type": "decks", "items": [{id, fil, tittel, endret, lysbilder, ferdig, aktiv, redigerbar}]}
+    {"type": "decks", "items": [{id, fil, tittel, endret, lysbilder, ferdig, aktiv, redigerbar, markedsbasen}],
+     "base": "Markedsbasen" | null}                          navnet på den delte basen (null = slått av)
                                                              alle presentasjonene (connectors/presentasjon.py)
     {"type": "deck_open", "path": "presentasjoner/…"}        åpne en presentasjon i visningen nå
     {"type": "mute", "muted": true}                          stemmen er dempet: Eddie svarer bare med tekst
@@ -42,6 +43,8 @@
     {"type": "command", "action": "message", "text": "..."}  skrevet melding fra chatten (maks 2000 tegn)
     {"type": "command", "action": "add_visual", "nummer": 2, "presentasjon": "<id>" | "", "kind": "prosjekt"}
                                                              dra-og-slipp: graf 2 inn i en samling ("" = ny av typen kind)
+    {"type": "command", "action": "base", "presentasjon": "<id>", "on": true}
+                                                             legg samlingen i (eller ta den ut av) den delte basen
 -->
 <style>
   /* OBOS Grunnmuren: mørk marineblå (#002169) som base, lyseblå og mint som aksent, grønn til handlinger,
@@ -166,6 +169,10 @@
   .deck-list .t { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.2; overflow-wrap: anywhere; }
   .deck-list .m { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); margin-top: 3px; }
   .deck-list .m b { font-weight: 500; color: var(--state, var(--cyan)); }
+  /* Den delte basen (Markedsbasen): Mikael velger selv hva som legges der */
+  .base-btn { margin-top: 6px; padding: 3px 8px; font-size: 9.5px; letter-spacing: .12em; color: var(--text-dim); }
+  .base-btn.on { color: #fff; background: var(--obos-green); border-color: var(--obos-green); }
+  .base-btn.on:hover { background: #00704F; }
   .deck-list li.new { border-style: dashed; color: var(--text-dim); font-family: var(--mono); font-size: 10.5px;
     letter-spacing: .14em; text-transform: uppercase; text-align: center; cursor: default; }
   .deck-list li.locked { opacity: .65; }
@@ -473,6 +480,7 @@
     <header><h3 id="deck-title">Presentasjon</h3>
       <div class="actions"><a class="btn" id="deck-new-tab" target="_blank" rel="noopener">Åpne i ny fane</a>
         <a class="btn" id="deck-pdf" target="_blank" rel="noopener" hidden>PDF</a>
+        <a class="btn" id="deck-md" target="_blank" rel="noopener" hidden>Analysenotat</a>
         <button id="deck-to-archive">Arkiv</button><button id="deck-close" aria-label="Lukk presentasjonen">✕</button></div></header>
     <iframe id="deck-frame" title="Presentasjon"></iframe>
   </section>
@@ -1395,7 +1403,7 @@ function connect() {
       case "activity": Eddie.activity(m.path || []); break;
       case "sources": Eddie.sources(Array.isArray(m.items) ? m.items : [], !!m.pending, Array.isArray(m.calcs) ? m.calcs : []); break;
       case "visuals": Eddie.visuals(Array.isArray(m.items) ? m.items : []); break;
-      case "decks": renderDecks(Array.isArray(m.items) ? m.items : []); break;
+      case "decks": baseName = typeof m.base === "string" ? m.base : null; renderDecks(Array.isArray(m.items) ? m.items : []); break;
       case "mute": setMuted(!!m.muted); break;
       case "deck_open": openDeckPath(String(m.path || "")); break;
     }
@@ -1426,6 +1434,9 @@ function openDeck(path, title) {
   const pdfLink = document.getElementById("deck-pdf");
   pdfLink.hidden = !entry?.pdf;
   if (entry?.pdf) pdfLink.href = url.replace(/\.html$/, ".pdf");
+  const mdLink = document.getElementById("deck-md");  // analysenotatet (Markdown) finnes for alle nye samlinger
+  mdLink.hidden = !entry?.redigerbar;
+  if (entry?.redigerbar) mdLink.href = url.replace(/\.html$/, ".md");
   deckUi.frame.src = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();  // alltid nyeste versjon
   deckUi.view.hidden = false;
 }
@@ -1460,6 +1471,19 @@ function dropTarget(li, deckId, kind = "presentasjon") {
     }
   });
 }
+let baseName = null;  // navnet på den delte basen, eller null når den ikke er satt opp
+function baseButton(d) {
+  // Bare Mikael legger noe i basen: et klikk legger samlingen inn, et nytt klikk tar den ut igjen.
+  const btn = document.createElement("button");
+  btn.className = "base-btn" + (d.markedsbasen ? " on" : "");
+  btn.textContent = d.markedsbasen ? "I " + baseName : "+ " + baseName;
+  btn.title = d.markedsbasen ? `Ligger i ${baseName}. Klikk for å ta den ut.` : `Lagre analysen i ${baseName}, så kollegaer finner den`;
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    sendCommand({ action: "base", presentasjon: d.id, on: !d.markedsbasen });
+  });
+  return btn;
+}
 function renderDecks(items) {
   decks = items;
   deckUi.total.textContent = items.length;
@@ -1472,6 +1496,7 @@ function renderDecks(items) {
     li.classList.toggle("locked", !d.redigerbar);
     li.addEventListener("click", () => openDeck("presentasjoner/" + d.fil, d.tittel));
     if (d.redigerbar) dropTarget(li, d.id, d.type);
+    if (d.redigerbar && baseName && d.lysbilder) li.append(baseButton(d));
     return li;
   };
   // Én gruppe per type: presentasjoner og prosjekter alltid, andre typer når de finnes. Hver med sin «+ ny».
