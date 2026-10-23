@@ -37,9 +37,11 @@
      "base": "Markedsbasen" | null}                          navnet på den delte basen (null = slått av)
                                                              alle presentasjonene (connectors/presentasjon.py)
     {"type": "deck_open", "path": "presentasjoner/…"}        åpne en presentasjon i visningen nå
+    {"type": "projects", "items": [{navn, ansvarlig, status, beskrivelse, oppdatert, sporsmal, filer, analyser, kilder,
+     metoder}]}                                              prosjekthubene (projects.py): én oversikt per prosjektmappe
     {"type": "mute", "muted": true}                          stemmen er dempet: Eddie svarer bare med tekst
   Kommandoer til Eddie:
-    {"type": "command", "action": "talk" | "stop" | "mute" | "unmute"}
+    {"type": "command", "action": "talk" | "stop" | "mute" | "unmute" | "projects"}   projects = les prosjektene på nytt
     {"type": "command", "action": "message", "text": "..."}  skrevet melding fra chatten (maks 2000 tegn)
     {"type": "command", "action": "add_visual", "nummer": 2, "presentasjon": "<id>" | "", "kind": "prosjekt"}
                                                              dra-og-slipp: graf 2 inn i en samling ("" = ny av typen kind)
@@ -154,6 +156,54 @@
   .side { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
   .panel.system { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .panel.decks { flex: 1 1 auto; min-height: 150px; }
+  .panel.hubs { flex: 0 0 auto; max-height: 40%; }
+  .hub-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; overflow-y: auto; }
+  .hub-list li { padding: 8px 10px; border: 1px solid var(--line); cursor: pointer; background: rgba(0, 16, 52, .35);
+    transition: border-color .15s, background .15s; }
+  .hub-list li:hover { border-color: var(--state, var(--cyan)); background: rgba(190, 223, 236, .06); }
+  .hub-list .t { font-weight: 600; font-size: 15px; }
+  .hub-list .m { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); margin-top: 2px; }
+
+  /* Prosjekthuben: lys OBOS-side over portalen, som presentasjonene */
+  .hub-view {
+    --navy: #002169; --green: #008761; --ink: #1f1f1f; --dim: #595959; --rule: #E6E6E6; --sky: #BEDFEC;
+    position: fixed; inset: 3vh 3vw; z-index: 20; display: flex; flex-direction: column; overflow: hidden;
+    background: #F2F2F2; color: var(--ink); border-radius: 4px; box-shadow: 0 20px 80px rgba(0, 0, 0, .7);
+    font-family: var(--body); animation: fadein .3s ease-out;
+  }
+  .hub-view[hidden] { display: none; }
+  .hub-top { background: var(--navy); color: #fff; padding: 18px 26px 16px; display: flex; justify-content: space-between; gap: 20px; }
+  .hub-top .label { display: inline-block; background: var(--green); color: #fff; font-size: 11px; font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase; padding: 3px 9px; border-radius: 2px; }
+  .hub-top h2 { margin: 8px 0 4px; font-family: var(--head); font-size: 30px; font-weight: 700; letter-spacing: -.01em; color: #fff; }
+  .hub-top p { margin: 0; color: var(--sky); max-width: 70ch; }
+  .hub-top .facts { margin-top: 8px; font-size: 13px; color: #fff; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+  .hub-top .facts span { color: var(--sky); }
+  .hub-top .actions { display: flex; gap: 6px; align-items: flex-start; }
+  .hub-top button { color: #fff; border-color: rgba(255, 255, 255, .35); background: transparent; }
+  .hub-body { flex: 1; overflow: auto; padding: 18px 26px 26px; display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-content: start; }
+  .hub-card { background: #fff; border: 1px solid var(--rule); border-radius: 4px; padding: 14px 16px; min-width: 0; }
+  .hub-card.wide { grid-column: 1 / -1; }
+  .hub-card h3 { margin: 0 0 4px; font-family: var(--head); font-size: 17px; color: var(--navy); display: flex; justify-content: space-between; }
+  .hub-card h3 small { font-family: var(--body); font-size: 12px; color: var(--dim); font-weight: 500; }
+  .hub-card .why { margin: 0 0 10px; font-size: 13px; color: var(--dim); }
+  .hub-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .hub-card li { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; padding: 5px 0; border-bottom: 1px solid var(--rule); }
+  .hub-card li:last-child { border-bottom: 0; }
+  .hub-card li span { color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .hub-card a { color: #0047BA; text-decoration: none; overflow-wrap: anywhere; }
+  .hub-card a:hover { text-decoration: underline; }
+  .hub-card h4 { margin: 10px 0 2px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--green); }
+  .hub-card .empty { color: var(--dim); font-size: 13px; }
+  .hub-ask { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hub-ask button { font: 500 14px var(--body); letter-spacing: 0; text-transform: none; color: var(--navy); background: #fff;
+    border: 1px solid var(--navy); border-radius: 18px; padding: 7px 14px; }
+  .hub-ask button:hover { background: var(--navy); color: #fff; box-shadow: none; }
+  .hub-ask button.primary { background: var(--green); border-color: var(--green); color: #fff; }
+  .hub-ask button.primary:hover { background: #00704F; }
+  .chip { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 2px; }
+  .chip.base { background: var(--green); color: #fff; }
   .deck-group { list-style: none; margin: 10px 0 2px; font-family: var(--mono); font-size: 10px; letter-spacing: .24em;
     text-transform: uppercase; color: var(--state, var(--cyan)); display: flex; justify-content: space-between; }
   .deck-group:first-child { margin-top: 0; }
@@ -426,6 +476,11 @@
 
   <div class="side">
 
+  <section class="panel hubs" aria-label="Prosjekter: én hub per prosjekt">
+    <h2>PROSJEKTER <small id="hub-total">0</small></h2>
+    <ul class="hub-list" id="hub-list"></ul>
+  </section>
+
   <section class="panel decks" aria-label="Samlinger: presentasjoner, prosjekter og annet">
     <h2>SAMLINGER <small id="deck-total">0</small></h2>
     <ul class="deck-list" id="deck-list"></ul>
@@ -476,6 +531,14 @@
       <button class="primary" id="demo" title="D">Kjør demo</button>
     </div>
   </footer>
+  <section class="hub-view" id="hub-view" hidden aria-label="Prosjekthub">
+    <div class="hub-top">
+      <div><span class="label">Prosjekthub</span><h2 id="hub-name"></h2><p id="hub-desc"></p><div class="facts" id="hub-facts"></div></div>
+      <div class="actions"><button id="hub-refresh" title="Les prosjektmappen på nytt">Oppdater</button>
+        <button id="hub-close" aria-label="Lukk prosjekthuben">✕</button></div>
+    </div>
+    <div class="hub-body" id="hub-body"></div>
+  </section>
   <section class="deck-view" id="deck-view" hidden aria-label="Presentasjon">
     <header><h3 id="deck-title">Presentasjon</h3>
       <div class="actions"><a class="btn" id="deck-new-tab" target="_blank" rel="noopener">Åpne i ny fane</a>
@@ -1403,6 +1466,7 @@ function connect() {
       case "activity": Eddie.activity(m.path || []); break;
       case "sources": Eddie.sources(Array.isArray(m.items) ? m.items : [], !!m.pending, Array.isArray(m.calcs) ? m.calcs : []); break;
       case "visuals": Eddie.visuals(Array.isArray(m.items) ? m.items : []); break;
+      case "projects": renderHubs(Array.isArray(m.items) ? m.items : []); break;
       case "decks": baseName = typeof m.base === "string" ? m.base : null; renderDecks(Array.isArray(m.items) ? m.items : []); break;
       case "mute": setMuted(!!m.muted); break;
       case "deck_open": openDeckPath(String(m.path || "")); break;
@@ -1536,6 +1600,91 @@ function clearDecks() {
 document.getElementById("deck-to-archive").addEventListener("click", () => openDeck("presentasjoner/", "Arkiv"));
 document.getElementById("deck-close").addEventListener("click", closeDeck);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !deckUi.view.hidden) closeDeck(); });
+
+/* ---------- Prosjekthuber (projects.py) ---------- */
+// Én oversikt per prosjekt: hva som finnes, hvilke analyser og kilder det bygger på, og spørsmål man kan stille.
+// Laget for at også de som ikke er vant med KI, ser hva Eddie vet og kommer i gang med ett klikk.
+let hubs = [], hubOpen = null;
+const hubView = document.getElementById("hub-view");
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const shortDate = iso => iso ? new Date(iso).toLocaleDateString("no-NO", { day: "numeric", month: "short", year: "numeric" }) : "";
+
+function renderHubs(items) {
+  hubs = items;
+  document.getElementById("hub-total").textContent = items.length;
+  document.getElementById("hub-list").replaceChildren(...items.map(h => {
+    const li = el("li", { title: "Åpne prosjekthuben" },
+      el("div", { className: "t", textContent: h.navn }),
+      el("div", { className: "m", textContent: [h.status, `${h.filer.length} filer`, `${h.analyser.length} analyser`].filter(Boolean).join(" · ") }));
+    li.addEventListener("click", () => openHub(h.navn));
+    return li;
+  }));
+  if (hubOpen) { const h = hubs.find(x => x.navn === hubOpen); if (h) showHub(h); }
+}
+function openHub(name) { const h = hubs.find(x => x.navn === name); if (h) { hubOpen = name; showHub(h); } }
+function closeHub() { hubView.hidden = true; hubOpen = null; }
+function ask(text) {
+  // Spørsmålet går til Eddie som om det var skrevet i chatten; huben lukkes så svaret synes.
+  if (sendCommand({ action: "message", text })) closeHub();
+}
+function card(title, why, count, ...content) {
+  return el("section", { className: "hub-card" },
+    el("h3", {}, title, el("small", { textContent: count ?? "" })), why ? el("p", { className: "why", textContent: why }) : "",
+    ...content);
+}
+function fileLink(url, text) {
+  const href = sourceHref(url);
+  return href ? el("a", { href, target: "_blank", rel: "noopener noreferrer", textContent: text }) : document.createTextNode(text);
+}
+function showHub(h) {
+  document.getElementById("hub-name").textContent = h.navn;
+  document.getElementById("hub-desc").textContent = h.beskrivelse || "Ingen beskrivelse ennå. Legg en prosjekt.md i prosjektmappen.";
+  document.getElementById("hub-facts").replaceChildren(
+    ...[["Ansvarlig", h.ansvarlig], ["Status", h.status], ["Sist oppdatert", shortDate(h.oppdatert)], ["Mappe", h.mappe]]
+      .filter(([, v]) => v).map(([k, v]) => el("div", {}, el("span", { textContent: k + ": " }), v)));
+
+  const start = el("section", { className: "hub-card wide" },
+    el("h3", {}, "Kom i gang"),
+    el("p", { className: "why", textContent: "Klikk et spørsmål, så svarer Eddie med det som finnes i prosjektet. Du kan også snakke eller skrive fritt." }),
+    el("div", { className: "hub-ask" },
+      el("button", { className: "primary", textContent: "Lag prosjektstatus", onclick: () => ask(`Lag prosjektstatus for ${h.navn}.`) }),
+      ...h.sporsmal.map(q => el("button", { textContent: q, onclick: () => ask(q) }))));
+
+  const byFolder = {};
+  for (const f of h.filer) (byFolder[f.mappe] ||= []).push(f);
+  const files = card("Informasjon i prosjektet", "Alt som ligger i prosjektmappen. Dette er grunnlaget Eddie bruker.", `${h.filer.length} filer`,
+    ...(h.filer.length ? Object.entries(byFolder).map(([folder, list]) => el("div", {}, el("h4", { textContent: folder }),
+      el("ul", {}, ...list.map(f => el("li", {}, fileLink(f.url, f.navn), el("span", { textContent: shortDate(f.endret) })))))) :
+      [el("p", { className: "empty", textContent: "Mappen er tom." })]));
+
+  const analyses = card("Analyser og innsikt", "Presentasjoner og prosjektstatuser om prosjektet, med analysenotat.", `${h.analyser.length}`,
+    h.analyser.length ? el("ul", {}, ...h.analyser.map(a => {
+      const open = el("a", { href: "#", textContent: a.tittel });
+      open.addEventListener("click", e => { e.preventDefault(); closeHub(); openDeck("presentasjoner/" + a.fil, a.tittel); });
+      return el("li", {}, el("div", {}, open, " ", a.markedsbasen ? el("span", { className: "chip base", textContent: baseName || "Markedsbasen" }) : ""),
+        el("span", { textContent: `${a.lysbilder} lysbilder · ${shortDate(a.endret)}` }));
+    })) : el("p", { className: "empty", textContent: "Ingen analyser ennå. Trykk «Lag prosjektstatus» for å lage den første." }));
+
+  const sources = card("Kilder", "Det analysene bygger på. Klikk for å se selve kilden.", `${h.kilder.length}`,
+    h.kilder.length ? el("ul", {}, ...h.kilder.map(k => el("li", {}, fileLink(k.url, k.title), el("span", { textContent: k.kind })))) :
+      el("p", { className: "empty", textContent: "Kildene vises når det finnes analyser." }));
+
+  const methods = card("Metoder", "Fagkunnskapen Eddie følger når han tolker prosjektet. Eies av fagfolk, kan endres av dem.", `${h.metoder.length}`,
+    h.metoder.length ? el("ul", {}, ...h.metoder.map(m => el("li", {}, el("div", {}, fileLink(m.url, m.navn), el("div", { className: "why", textContent: m.rolle })),
+      el("span", { textContent: m.versjon ? "v" + m.versjon : "" })))) : el("p", { className: "empty", textContent: "Ingen metoder ennå." }));
+
+  const help = card("Slik bruker du huben", "", "",
+    el("ul", {}, ...["Legg filer i prosjektmappen, så ser Eddie dem.",
+      "Still spørsmål med knappene over, eller snakk og skriv fritt.",
+      "Under hver graf viser «Slik er det laget» kilder og utregning.",
+      "Lagre gode analyser i " + (baseName || "Markedsbasen") + ", så finner kollegaer dem."].map(t => el("li", { textContent: t }))));
+
+  document.getElementById("hub-body").replaceChildren(start, files, analyses, sources, methods, help);
+  hubView.hidden = false;
+}
+document.getElementById("hub-close").addEventListener("click", closeHub);
+document.getElementById("hub-refresh").addEventListener("click", () => sendCommand({ action: "projects" }));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !hubView.hidden) closeHub(); });
 
 /* ---------- Stemmeknappen og chatten ---------- */
 const talkBtn = document.getElementById("talk");
