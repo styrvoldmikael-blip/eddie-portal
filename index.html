@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>E.D.D.I.E</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23c084fc' opacity='.18'/%3E%3Cg fill='%23f0abfc'%3E%3Ccircle cx='32' cy='32' r='5'/%3E%3Ccircle cx='18' cy='24' r='2.5'/%3E%3Ccircle cx='44' cy='20' r='2.5'/%3E%3Ccircle cx='46' cy='40' r='2.5'/%3E%3Ccircle cx='22' cy='44' r='2.5'/%3E%3Ccircle cx='32' cy='12' r='2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%23BEDFEC' opacity='.18'/%3E%3Cg fill='%23FFFFFF'%3E%3Ccircle cx='32' cy='32' r='5'/%3E%3Ccircle cx='18' cy='24' r='2.5'/%3E%3Ccircle cx='44' cy='20' r='2.5'/%3E%3Ccircle cx='46' cy='40' r='2.5'/%3E%3Ccircle cx='22' cy='44' r='2.5'/%3E%3Ccircle cx='32' cy='12' r='2'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&display=swap" rel="stylesheet">
 <!--
   Eddies grensesnitt. Åpnes direkte i nettleseren (file://) eller fra GitHub Pages.
 
@@ -44,29 +44,34 @@
                                                              dra-og-slipp: graf 2 inn i en samling ("" = ny av typen kind)
 -->
 <style>
+  /* OBOS Grunnmuren: mørk marineblå (#002169) som base, lyseblå og mint som aksent, grønn til handlinger,
+     rød bare for feil. Gul brukes bare som varsel («følg med»), fordi status trenger grønn/gul/rød.
+     Fontene etterligner OBOS Text og OBOS Display (som er OBOS' egne og ikke kan brukes fritt). */
   :root {
-    --bg: #05030a;
-    --bg-2: #0e0716;
-    --cyan: #4fd8ff;
-    --cyan-bright: #b4f2ff;
-    --cyan-dim: rgba(79, 216, 255, 0.28);
-    --cyan-faint: rgba(79, 216, 255, 0.08);
-    --amber: #ffb547;
-    --red: #ff4d5e;
-    --green: #57ffb0;
-    --text: #e4dcf0;
-    --text-dim: #8a7fa3;
-    --panel: rgba(16, 10, 26, 0.6);
-    --line: rgba(220, 160, 255, 0.16);
-    --head: "Orbitron", "Segoe UI", system-ui, sans-serif;
-    --body: "Rajdhani", "Segoe UI", system-ui, sans-serif;
-    --mono: "JetBrains Mono", Consolas, monospace;
-    --big: "Bebas Neue", "Orbitron", sans-serif;
+    --navy: #002169;
+    --bg: #001542;
+    --bg-2: #002169;
+    --cyan: #BEDFEC;
+    --cyan-bright: #E3F1F7;
+    --cyan-dim: rgba(190, 223, 236, 0.28);
+    --cyan-faint: rgba(190, 223, 236, 0.08);
+    --amber: #E9C46A;
+    --red: #E0607E;
+    --green: #6CC2A3;
+    --obos-green: #008761;
+    --text: #F3F7FB;
+    --text-dim: #A9C4DD;
+    --panel: rgba(0, 24, 80, 0.55);
+    --line: rgba(190, 223, 236, 0.18);
+    --head: "Inter Tight", "Inter", "Segoe UI", Arial, sans-serif;
+    --body: "Inter", "Segoe UI", Arial, sans-serif;
+    --mono: "Inter", "Segoe UI", Arial, sans-serif;
+    --big: "Inter Tight", "Inter", "Segoe UI", Arial, sans-serif;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
-    background: radial-gradient(ellipse at 50% 42%, #1a0d26 0%, var(--bg-2) 40%, var(--bg) 80%), var(--bg);
+    background: radial-gradient(ellipse at 50% 42%, #0A3486 0%, var(--bg-2) 45%, var(--bg) 85%), var(--bg);
     color: var(--text);
     font-family: var(--body);
     font-size: 16px;
@@ -74,8 +79,7 @@
   }
   body::after {
     content: ""; position: fixed; inset: 0; pointer-events: none;
-    background: repeating-linear-gradient(to bottom, rgba(255,255,255,.012) 0 1px, transparent 1px 3px),
-                radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.7) 100%);
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 10, 40, .55) 100%);
   }
 
   .app {
@@ -98,7 +102,7 @@
   .brand { display: flex; align-items: baseline; gap: 14px; }
   .brand h1 {
     margin: 0; font-family: var(--head); font-weight: 700; font-size: 26px; letter-spacing: .32em;
-    color: #f3e8ff; text-shadow: 0 0 14px var(--state, var(--cyan));
+    color: #FFFFFF; text-shadow: 0 0 14px var(--state, var(--cyan));
   }
   .head-right { display: flex; align-items: center; gap: 22px; }
 
@@ -110,11 +114,11 @@
   .sysmenu.open .sysbtn::after { transform: rotate(180deg); }
   .sysmenu .panel.system {
     position: absolute; right: 0; top: calc(100% + 10px); width: 320px; max-height: 70vh; z-index: 30;
-    overflow: hidden auto; display: none; background: rgba(14, 8, 22, .97); box-shadow: 0 16px 50px rgba(0, 0, 0, .6);
+    overflow: hidden auto; display: none; background: rgba(0, 21, 66, .97); box-shadow: 0 16px 50px rgba(0, 0, 0, .6);
   }
   .sysmenu.open .panel.system { display: flex; }
   .clock { text-align: right; font-family: var(--head); }
-  .clock .time { font-size: 22px; letter-spacing: .12em; color: #f3e8ff; }
+  .clock .time { font-size: 22px; letter-spacing: .12em; color: #FFFFFF; }
   .clock .date { font-family: var(--body); font-size: 13px; letter-spacing: .18em; color: var(--text-dim); text-transform: uppercase; }
 
   /* Paneler */
@@ -156,9 +160,9 @@
     overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .deck-list li {
     padding: 7px 9px; border: 1px solid var(--line); cursor: pointer; transition: border-color .15s, background .15s;
-    background: rgba(5, 3, 10, .35);
+    background: rgba(0, 16, 52, .35);
   }
-  .deck-list li:hover { border-color: var(--state, var(--cyan)); background: rgba(240, 171, 252, .06); }
+  .deck-list li:hover { border-color: var(--state, var(--cyan)); background: rgba(190, 223, 236, .06); }
   .deck-list .t { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.2; overflow-wrap: anywhere; }
   .deck-list .m { font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); margin-top: 3px; }
   .deck-list .m b { font-weight: 500; color: var(--state, var(--cyan)); }
@@ -167,9 +171,9 @@
   .deck-list li.locked { opacity: .65; }
   /* Mens en graf dras: presentasjonene som kan ta imot den, lyser opp */
   body.dragging-visual .deck-list li:not(.locked):not(.deck-group) { border-color: var(--state, var(--cyan)); border-style: dashed; }
-  .deck-list li.over { background: rgba(240, 171, 252, .16); box-shadow: 0 0 14px rgba(240, 171, 252, .3); }
+  .deck-list li.over { background: rgba(190, 223, 236, .16); box-shadow: 0 0 14px rgba(190, 223, 236, .3); }
   .deck-list li.added { animation: added .9s ease-out; }
-  @keyframes added { 0% { background: rgba(87, 255, 176, .3); } }
+  @keyframes added { 0% { background: rgba(108, 194, 163, .3); } }
   .deck-note { margin: 8px 0 0; font-size: 13px; color: var(--text-dim); }
   .deck-note button { margin-left: 4px; padding: 3px 7px; font-size: 9.5px; }
   .visual[draggable="true"] { cursor: grab; }
@@ -188,7 +192,7 @@
 
   .metric { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
   .metric .row { display: flex; justify-content: space-between; align-items: baseline; }
-  .metric .big { font-family: var(--big); font-size: 38px; letter-spacing: .04em; color: #f3e8ff; }
+  .metric .big { font-family: var(--big); font-size: 38px; letter-spacing: .04em; color: #FFFFFF; }
   .metric .big.slow { color: var(--amber); }
   .metric .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
   .metric .split { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
@@ -204,8 +208,8 @@
     pointer-events: none; display: flex; flex-direction: column; align-items: center; }
   .mic {
     --lvl: 0; position: relative; width: 84px; height: 84px; padding: 0; border-radius: 50%; pointer-events: auto;
-    display: grid; place-items: center; color: #f3e8ff; background: rgba(14, 8, 22, .85);
-    border: 2px solid var(--state, var(--cyan)); box-shadow: 0 0 18px rgba(240, 171, 252, .18); transition: border-color .6s, box-shadow .3s;
+    display: grid; place-items: center; color: #FFFFFF; background: rgba(0, 21, 66, .85);
+    border: 2px solid var(--state, var(--cyan)); box-shadow: 0 0 18px rgba(190, 223, 236, .18); transition: border-color .6s, box-shadow .3s;
   }
   .mic svg { width: 32px; height: 32px; }
   .mic::before, .mic::after {
@@ -214,14 +218,14 @@
     transform: scale(calc(1 + var(--lvl) * .55)); transition: border-color .6s;
   }
   .mic::after { inset: -18px; border-width: 1px; opacity: calc(var(--lvl) * .6); transform: scale(calc(1 + var(--lvl) * .9)); }
-  .mic:hover { background: rgba(30, 16, 44, .9); box-shadow: 0 0 26px rgba(240, 171, 252, .35); }
+  .mic:hover { background: rgba(0, 40, 110, .9); box-shadow: 0 0 26px rgba(190, 223, 236, .35); }
   .mic.active { box-shadow: 0 0 30px var(--state, var(--cyan)); }
   .mic.active::before { animation: breathe 2.4s ease-in-out infinite; }
   @keyframes breathe { 50% { inset: -12px; } }
   /* Demp stemmen: liten knapp til høyre for mikrofonen */
   .mute {
     position: absolute; left: calc(50% + 70px); top: 19px; width: 46px; height: 46px; padding: 0; border-radius: 50%;
-    display: grid; place-items: center; pointer-events: auto; color: #f3e8ff; background: rgba(14, 8, 22, .9);
+    display: grid; place-items: center; pointer-events: auto; color: #FFFFFF; background: rgba(0, 21, 66, .9);
     border: 1px solid var(--state, var(--cyan)); transition: border-color .6s;
   }
   .mute svg { width: 22px; height: 22px; }
@@ -232,14 +236,14 @@
   .mute.on::after { content: "Dempet"; color: var(--amber); }
   .mute[hidden] { display: none; }
   .mute .off { display: none; }
-  .mute.on { color: var(--amber); border-color: var(--amber); box-shadow: 0 0 12px rgba(255, 181, 71, .35); }
+  .mute.on { color: var(--amber); border-color: var(--amber); box-shadow: 0 0 12px rgba(233, 196, 106, .35); }
   .mute.on .off { display: block; }
   .mute.on .waves { display: none; }
   .voice .lbl { margin-top: 16px; font-family: var(--mono); font-size: 11px; letter-spacing: .3em; color: var(--state, var(--cyan)); text-transform: uppercase; transition: color .6s; }
   .voice .sub { margin-top: 4px; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--text-dim); text-transform: uppercase; }
   .tooltip {
     position: absolute; pointer-events: none; max-width: 260px; padding: 8px 10px; z-index: 3;
-    background: rgba(14, 8, 22, .94); border: 1px solid var(--line);
+    background: rgba(0, 21, 66, .94); border: 1px solid var(--line);
     font-size: 14px; line-height: 1.3; color: var(--text); opacity: 0; transition: opacity .12s;
   }
   .tooltip.show { opacity: 1; }
@@ -316,7 +320,7 @@
   /* Presentasjonen Eddie bygger: knapper i bunnstripen og en visning over hele siden */
   .deck-view {
     position: fixed; inset: 3vh 3vw; z-index: 20; display: flex; flex-direction: column;
-    background: rgba(12, 7, 20, .97); border: 1px solid var(--line); border-top: 2px solid var(--state, var(--cyan));
+    background: rgba(0, 21, 66, .97); border: 1px solid var(--line); border-top: 2px solid var(--state, var(--cyan));
     box-shadow: 0 20px 80px rgba(0, 0, 0, .7); animation: fadein .3s ease-out;
   }
   .deck-view[hidden] { display: none; }
@@ -324,11 +328,11 @@
   .deck-view header::after { display: none; }
   .deck-view h3 { margin: 0; font-family: var(--mono); font-weight: 500; font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--state, var(--cyan)); }
   .deck-view .actions { display: flex; gap: 6px; }
-  .deck-view a.btn { font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: #e9d5ff;
+  .deck-view a.btn { font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: #E3F1F7;
     border: 1px solid var(--line); padding: 8px 10px; text-decoration: none; }
   .deck-view a.btn[hidden] { display: none; }
-  .deck-view a.btn:hover { background: rgba(240,171,252,.12); color: #fff; }
-  .deck-view iframe { flex: 1; width: 100%; border: 0; background: #ebe8f1; }
+  .deck-view a.btn:hover { background: rgba(190, 223, 236, .12); color: #fff; }
+  .deck-view iframe { flex: 1; width: 100%; border: 0; background: #F2F2F2; }
 
   /* Samtalepanel */
   .log { overflow-y: auto; flex: 1; min-height: 0; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
@@ -336,13 +340,13 @@
   .msg .who { font-family: var(--mono); font-size: 10px; letter-spacing: .3em; color: var(--text-dim); display: flex; gap: 10px; }
   .msg.eddie .who { color: var(--state, var(--cyan)); }
   .msg .txt { font-size: 17px; line-height: 1.35; margin-top: 3px; }
-  .msg.user .txt { color: #f1ebf8; }
-  .msg.eddie .txt { color: #e9d5ff; }
+  .msg.user .txt { color: #FFFFFF; }
+  .msg.eddie .txt { color: #E3F1F7; }
   .msg.eddie.live .txt::after { content: "▍"; color: var(--state, var(--cyan)); animation: blink 1s steps(2) infinite; }
   .empty { color: var(--text-dim); font-size: 15px; letter-spacing: .05em; }
   .chat { display: flex; gap: 8px; margin: 12px 0 0; border-top: 1px solid var(--line); padding-top: 12px; }
   .chat input {
-    flex: 1; min-width: 0; font: 500 16px var(--body); color: var(--text); background: rgba(5, 3, 10, .6);
+    flex: 1; min-width: 0; font: 500 16px var(--body); color: var(--text); background: rgba(0, 16, 52, .6);
     border: 1px solid var(--line); padding: 9px 12px; outline: none; transition: border-color .2s;
   }
   .chat input:focus { border-color: var(--state, var(--cyan)); }
@@ -357,18 +361,18 @@
     border-top: 1px solid var(--line); padding-top: 12px;
   }
   .subtitle { min-height: 52px; }
-  .subtitle .line { font-size: 22px; font-weight: 500; color: #f3e8ff; line-height: 1.25; }
+  .subtitle .line { font-size: 22px; font-weight: 500; color: #FFFFFF; line-height: 1.25; }
   .subtitle .hint { font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-top: 6px; }
   .controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
   .controls .conn { font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); margin-right: 8px; display: flex; align-items: center; gap: 8px; }
   button {
     font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase;
-    color: #e9d5ff; background: rgba(240,171,252,.04); border: 1px solid var(--line);
+    color: #E3F1F7; background: rgba(190, 223, 236, .04); border: 1px solid var(--line);
     padding: 8px 10px; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
   }
-  button:hover { background: rgba(240,171,252,.12); color: #fff; box-shadow: 0 0 10px rgba(240,171,252,.25); }
+  button:hover { background: rgba(190, 223, 236, .12); color: #fff; box-shadow: 0 0 10px rgba(190, 223, 236, .25); }
   button.primary { border-color: var(--state, var(--cyan)); }
-  button:focus-visible { outline: 2px solid #f0abfc; outline-offset: 2px; }
+  button:focus-visible { outline: 2px solid #BEDFEC; outline-offset: 2px; }
   .controls.hidden button { display: none; }
 
   /* Smal skjerm: hjernen øverst, panelene under. */
@@ -479,23 +483,23 @@
 
 /* ---------- Tilstander: fargen hele hjernen tones mot ---------- */
 const STATES = {
-  idle:      { label: "Standby", color: [196, 140, 255], glow: 0.45, spin: 0.10, hint: "Trykk kort på høyre Ctrl for å snakke" },
-  listening: { label: "Lytter",  color: [79, 216, 255],  glow: 0.9,  spin: 0.14, hint: "Snakk – Eddie lytter" },
-  thinking:  { label: "Tenker",  color: [255, 181, 71],  glow: 0.85, spin: 0.42, hint: "Eddie tenker …" },
-  searching: { label: "Leter",   color: [255, 150, 60],  glow: 0.95, spin: 0.26, hint: "Eddie leter i hjernen …" },
-  speaking:  { label: "Snakker", color: [236, 112, 255], glow: 1.0,  spin: 0.18, hint: "Snakk for å avbryte" },
-  error:     { label: "Feil",    color: [255, 77, 94],   glow: 0.8,  spin: 0.05, hint: "Noe gikk galt – se loggen" },
+  idle:      { label: "Standby", color: [190, 223, 236], glow: 0.45, spin: 0.10, hint: "Trykk kort på høyre Ctrl for å snakke" },
+  listening: { label: "Lytter",  color: [108, 194, 163], glow: 0.9,  spin: 0.14, hint: "Snakk – Eddie lytter" },
+  thinking:  { label: "Tenker",  color: [127, 191, 214], glow: 0.85, spin: 0.42, hint: "Eddie tenker …" },
+  searching: { label: "Leter",   color: [255, 255, 255], glow: 0.95, spin: 0.26, hint: "Eddie leter i hjernen …" },
+  speaking:  { label: "Snakker", color: [76, 201, 146],  glow: 1.0,  spin: 0.18, hint: "Snakk for å avbryte" },
+  error:     { label: "Feil",    color: [224, 96, 126],  glow: 0.8,  spin: 0.05, hint: "Noe gikk galt – se loggen" },
 };
 
 /* Nodetyper fra knowledge_graph.py: farge, størrelse, avstand fra kjernen, navn */
 const TYPES = {
   core:      { color: [255, 245, 255], r: 7,   name: "Eddie",     one: "",          plural: "" },
-  connector: { color: [216, 180, 254], r: 5,   name: "Connector", one: "connector", plural: "connectorer" },
-  hub:       { color: [196, 181, 253], r: 4.2, name: "Samling",   one: "samling",   plural: "samlinger" },
-  tool:      { color: [125, 211, 252], r: 3.2, name: "Verktøy",   one: "verktøy",   plural: "verktøy" },
-  knowledge: { color: [134, 239, 172], r: 2.8, name: "Kunnskap",  one: "kunnskap",  plural: "kunnskap" },
-  memory:    { color: [249, 168, 212], r: 3.2, name: "Minne",     one: "minne",     plural: "minner" },
-  content:   { color: [253, 224, 71],  r: 3.4, name: "Innhold",   one: "innhold",   plural: "innhold" },
+  connector: { color: [190, 223, 236], r: 5,   name: "Connector", one: "connector", plural: "connectorer" },
+  hub:       { color: [227, 241, 247], r: 4.2, name: "Samling",   one: "samling",   plural: "samlinger" },
+  tool:      { color: [127, 191, 214], r: 3.2, name: "Verktøy",   one: "verktøy",   plural: "verktøy" },
+  knowledge: { color: [108, 194, 163], r: 2.8, name: "Kunnskap",  one: "kunnskap",  plural: "kunnskap" },
+  memory:    { color: [205, 236, 226], r: 3.2, name: "Minne",     one: "minne",     plural: "minner" },
+  content:   { color: [233, 196, 106], r: 3.4, name: "Innhold",   one: "innhold",   plural: "innhold" },
 };
 
 const ui = {
@@ -1100,7 +1104,7 @@ function draw(dt) {
   if (thinking && !reduced && Math.random() < dt * 40) B.filler[Math.floor(Math.random() * B.filler.length)].flash = 1;
 
   // Tråder mellom fyllpartikler, i tre lag etter dybde (én strek per lag).
-  const linkColor = mix(sc, [255, 230, 255], 0.2);
+  const linkColor = mix(sc, [227, 241, 247], 0.2);
   for (let layer = 0; layer < 3; layer++) {
     ctx.beginPath();
     for (const [i, j] of B.links) {
@@ -1212,7 +1216,7 @@ function draw(dt) {
       ctx.globalCompositeOperation = "source-over";
       ctx.font = `${big ? 600 : 500} ${big ? 13 : 12}px Rajdhani, "Segoe UI", sans-serif`;
       ctx.fillStyle = isLit || n === hover ? "rgba(255,255,255,.96)"
-        : `rgba(236,224,250,${(0.25 + 0.6 * depth) * (inBranch ? 1.3 : focus)})`;
+        : `rgba(227,241,247,${(0.25 + 0.6 * depth) * (inBranch ? 1.3 : focus)})`;
       ctx.fillText(n.label, n.s[0], n.s[1] - r - 6);
       ctx.globalCompositeOperation = "lighter";
     }
@@ -1296,10 +1300,10 @@ function drawSpark() {
   const max = Math.max(3, ...S.latencies), h = r.height, w = r.width;
   const y = v => h - 4 - (v / max) * (h - 8);
   // Mållinje 1,5 s
-  g.strokeStyle = "rgba(255,181,71,.45)"; g.setLineDash([3, 4]); g.beginPath();
+  g.strokeStyle = "rgba(233, 196, 106, .45)"; g.setLineDash([3, 4]); g.beginPath();
   g.moveTo(0, y(1.5)); g.lineTo(w, y(1.5)); g.stroke(); g.setLineDash([]);
   if (S.latencies.length < 2) return;
-  g.strokeStyle = "#e9a8ff"; g.lineWidth = 2; g.shadowColor = "#e9a8ff"; g.shadowBlur = 6; g.beginPath();
+  g.strokeStyle = "#BEDFEC"; g.lineWidth = 2; g.shadowColor = "#BEDFEC"; g.shadowBlur = 6; g.beginPath();
   S.latencies.forEach((v, i) => {
     const x = (i / (S.latencies.length - 1)) * w;
     i ? g.lineTo(x, y(v)) : g.moveTo(x, y(v));
