@@ -612,18 +612,42 @@
   .ask-hint { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
   .ask-hint b { color: #fff; }
 
+  /* Toppen uten skillelinje og klokke; logo når den finnes lokalt */
+  .topbar { background: none; border-bottom: 0; padding-bottom: 4px; }
+  .logo { height: 30px; width: auto; display: block; }
+  .has-logo .brand h1 { display: none; }
+  /* Ingen bunnstripe: alt står i samtaleboksen */
+  .app { grid-template-rows: auto 1fr; }
+  .panel.convo h2 { display: flex; align-items: center; gap: 10px; }
+  .panel.convo h2 small { margin-left: auto; }
+  .panel.convo .conn { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; letter-spacing: .14em; color: var(--muted); }
+  .panel.convo .hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+  .panel.convo .controls { justify-content: flex-start; margin-top: 8px; }
+  .panel.convo .controls.hidden { display: none; }
+  /* Hjernen øverst og mindre, innholdet under. Viser Eddie noe, krymper hjernen enda litt. */
+  .core { display: flex; flex-direction: column; gap: 10px; }
+  .brain { position: relative; flex: 0 0 48%; min-height: 240px; transition: flex-basis .4s ease; }
+  .core.has-visual .brain { flex-basis: 34%; }
+  .below { position: relative; flex: 1; min-height: 0; display: flex; }
+  .below-empty { margin: auto; font-size: 13px; color: var(--muted); }
+  .core.has-visual .below-empty { display: none; }
+  .below .visuals { position: relative; inset: auto; flex: 1; max-height: none; height: 100%; }
+  .voice { bottom: 0; }
+  .voice .mic { width: 64px; height: 64px; } .voice .mic svg { width: 26px; height: 26px; }
+  .voice .lbl { margin-top: 8px; }
+
   /* Samlinger og Kunnskap som egne sider */
   .view.samlinger { max-width: 760px; margin: 22px auto; } .view.samlinger .panel.decks { min-height: 60vh; }
   .view.core { position: relative; height: 100%; min-height: 520px; }
   .core-note { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
-  .visuals { left: 0; right: 0; top: 0; max-height: calc(100% - 8px); }
-  .visuals.multi { height: calc(100% - 8px); }
+  .visuals.multi { height: 100%; }
 
   @media (max-width: 1100px) {
     body { overflow: auto; }
     .app { grid-template-columns: 1fr; padding: 0 12px 12px; }
-    .core { grid-column: 1; grid-row: 2; height: min(115vw, 620px); } .side { grid-column: 1; grid-row: 3; }
-    .panel.convo { grid-column: 1; grid-row: 4; max-height: 70vh; } footer { grid-row: 5; }
+    .core { grid-column: 1; grid-row: 2; height: auto; } .brain { flex-basis: auto; height: min(90vw, 420px); }
+    .below .visuals { min-height: 320px; } .side { grid-column: 1; grid-row: 3; }
+    .panel.convo { grid-column: 1; grid-row: 4; max-height: 70vh; }
     .view.project { grid-column: 1; grid-row: 2 / 4; } .topbar { grid-template-columns: 1fr auto; }
     .proj-head, .two { grid-template-columns: 1fr; } .p4grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .hello { font-size: 34px; } .upd { display: none; }
@@ -635,6 +659,8 @@
   <!-- Toppen: merke, når prosjektene sist ble oppdatert, system og klokke -->
   <header class="topbar">
     <div class="brand">
+      <!-- Logoen finnes bare lokalt (web/logo.svg eller .png, ikke i git). Uten den, som på den offentlige siden, står navnet. -->
+      <img class="logo" src="logo" alt="OBOS" hidden onload="this.hidden = false; document.body.classList.add('has-logo')" onerror="this.remove()">
       <h1>E.D.D.I.E</h1>
       <span class="beta">BETA</span>
       <div class="upd">Oppdatert<b id="updated">–</b></div>
@@ -655,7 +681,6 @@
     </div>
   </section>
       </div>
-      <div class="clock"><div class="time" id="time">--:--:--</div><div class="date" id="date"></div></div>
     </div>
   </header>
 
@@ -673,12 +698,9 @@
 
   <!-- Hjernen: det Eddie er koblet til og vet om. Når han leter, lyser grenen han leter i. -->
   <section class="core" id="view-kunnskap" aria-label="Eddies hjerne: det han er koblet til og vet om">
+    <div class="brain">
     <canvas id="hud" aria-hidden="true"></canvas>
     <div class="tooltip" id="tooltip" role="tooltip"></div>
-    <div class="visuals" id="visuals" hidden aria-live="polite">
-      <div class="vis-grid" id="vis-grid"></div>
-      <button class="vis-close" id="vis-close" aria-label="Lukk visningene">✕</button>
-    </div>
     <div class="voice">
       <button class="mic" id="talk" aria-pressed="false" aria-label="Start samtale">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
@@ -692,13 +714,23 @@
       <div class="lbl" id="state-label" role="status">Standby</div>
       <div class="sub" id="brain-sub">Klikk for demo</div>
     </div>
+    </div>
+    <!-- Under hjernen: grafene, tabellene og budsjettene Eddie viser -->
+    <div class="below">
+      <p class="below-empty">Grafer, tabeller og budsjetter Eddie viser, kommer her.</p>
+      <div class="visuals" id="visuals" hidden aria-live="polite">
+        <div class="vis-grid" id="vis-grid"></div>
+        <button class="vis-close" id="vis-close" aria-label="Lukk visningene">✕</button>
+      </div>
+    </div>
   </section>
 
   <!-- Prosjektsiden legger seg over hjernen og prosjektlista; samtalen til høyre står igjen -->
   <section class="view project" id="view-project" hidden aria-label="Prosjekt"></section>
 
   <section class="panel convo" aria-label="Samtale">
-    <h2>SAMTALE <small id="count">0</small></h2>
+    <h2>SAMTALE <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-text">Kobler til …</span></span>
+      <small id="count">0</small></h2>
     <div class="log" id="log"><p class="empty" id="empty">Ingen samtale ennå. Klikk mikrofonen, trykk kort på høyre Ctrl og snakk, eller skriv under.</p></div>
     <!-- Et notat Eddie foreslår å lagre i prosjektmappen. Lagres bare hvis du sier ja eller trykker «Lagre». -->
     <div class="note-proposal" id="note-proposal" hidden role="group" aria-label="Forslag om å lagre et notat">
@@ -712,12 +744,10 @@
       <input id="chat-input" maxlength="2000" placeholder="Koble til Eddie for å skrive" aria-label="Skriv til Eddie" disabled>
       <button class="primary" id="chat-send" type="submit" disabled>Send</button>
     </form>
-  </section>
-
-  <footer>
-    <div class="subtitle"><div class="line" id="subtitle"></div><div class="hint" id="hint">Trykk kort på høyre Ctrl for å snakke</div></div>
+    <!-- Det som sto i bunnstripen: hvordan du snakker med Eddie, og demoknappene når han ikke er tilkoblet -->
+    <p class="hint" id="hint">Trykk kort på høyre Ctrl for å snakke</p>
+    <div class="line" id="subtitle" hidden></div>
     <div class="controls" id="controls">
-      <span class="conn"><span class="dot" id="conn-dot"></span><span id="conn-text">Kobler til …</span></span>
       <button data-state="idle" title="1">Standby</button>
       <button data-state="listening" title="2">Lytter</button>
       <button data-state="thinking" title="3">Tenker</button>
@@ -725,7 +755,8 @@
       <button data-state="speaking" title="5">Snakker</button>
       <button class="primary" id="demo" title="D">Kjør demo</button>
     </div>
-  </footer>
+  </section>
+
   <section class="deck-view" id="deck-view" hidden aria-label="Presentasjon">
     <header><h3 id="deck-title">Presentasjon</h3>
       <div class="actions"><a class="btn" id="deck-new-tab" target="_blank" rel="noopener">Åpne i ny fane</a>
@@ -1145,9 +1176,6 @@ function updateSystemDot() {
 /* ---------- Klokke ---------- */
 const started = Date.now();
 function tickClock() {
-  const now = new Date();
-  document.getElementById("time").textContent = now.toLocaleTimeString("no-NO");
-  document.getElementById("date").textContent = now.toLocaleDateString("no-NO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const up = Math.floor((Date.now() - started) / 1000);
   document.getElementById("uptime").textContent =
     `${String(Math.floor(up / 60)).padStart(2, "0")}:${String(up % 60).padStart(2, "0")}`;
