@@ -40,6 +40,8 @@
     {"type": "projects", "items": [{navn, ansvarlig, status, beskrivelse, oppdatert, sporsmal, filer, analyser, kilder,
      metoder}]}                                              prosjekthubene (projects.py): én oversikt per prosjektmappe
     {"type": "mute", "muted": true}                          stemmen er dempet: Eddie svarer bare med tekst
+    {"type": "note_proposal", "prosjekt", "tittel", "tekst"}  Eddie foreslår å lagre noe i prosjektmappen; uten felt:
+                                                             forslaget er avgjort. «Lagre» svarer «Ja, lagre det.»
   Kommandoer til Eddie:
     {"type": "command", "action": "talk" | "stop" | "mute" | "unmute" | "projects" | "clear_visuals"}
                                                              projects = les prosjektene på nytt; clear_visuals = lukk grafene
@@ -404,6 +406,13 @@
   .msg.eddie.live .txt::after { content: "▍"; color: var(--state, var(--cyan)); animation: blink 1s steps(2) infinite; }
   .empty { color: var(--text-dim); font-size: 15px; letter-spacing: .05em; }
   .chat { display: flex; gap: 8px; margin: 12px 0 0; border-top: 1px solid var(--line); padding-top: 12px; }
+  .note-proposal { margin-top: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid #1F5440; background: #143528; }
+  .np-label { font-size: 12px; color: #CDECE2; } .np-label b { color: #fff; }
+  .np-title { margin-top: 6px; font-weight: 700; color: #fff; }
+  .np-text { margin: 4px 0 10px; font-size: 14px; color: var(--text); white-space: pre-wrap; max-height: 8em; overflow: auto; }
+  .np-actions { display: flex; gap: 8px; }
+  .np-actions button { font: 600 13px var(--body); letter-spacing: 0; text-transform: none; border-radius: 8px; }
+  .np-no { background: none; border: 1px solid var(--edge); color: var(--muted); }
   .chat input {
     flex: 1; min-width: 0; font: 500 16px var(--body); color: var(--text); background: rgba(0, 16, 52, .6);
     border: 1px solid var(--line); padding: 9px 12px; outline: none; transition: border-color .2s;
@@ -691,6 +700,14 @@
   <section class="panel convo" aria-label="Samtale">
     <h2>SAMTALE <small id="count">0</small></h2>
     <div class="log" id="log"><p class="empty" id="empty">Ingen samtale ennå. Klikk mikrofonen, trykk kort på høyre Ctrl og snakk, eller skriv under.</p></div>
+    <!-- Et notat Eddie foreslår å lagre i prosjektmappen. Lagres bare hvis du sier ja eller trykker «Lagre». -->
+    <div class="note-proposal" id="note-proposal" hidden role="group" aria-label="Forslag om å lagre et notat">
+      <div class="np-label">Lagre i <b id="np-project"></b>?</div>
+      <div class="np-title" id="np-title"></div>
+      <p class="np-text" id="np-text"></p>
+      <div class="np-actions"><button type="button" class="primary-btn" id="np-yes">Lagre</button>
+        <button type="button" class="np-no" id="np-no">Ikke lagre</button></div>
+    </div>
     <form class="chat" id="chat" autocomplete="off">
       <input id="chat-input" maxlength="2000" placeholder="Koble til Eddie for å skrive" aria-label="Skriv til Eddie" disabled>
       <button class="primary" id="chat-send" type="submit" disabled>Send</button>
@@ -1623,6 +1640,7 @@ function connect() {
       case "sources": Eddie.sources(Array.isArray(m.items) ? m.items : [], !!m.pending, Array.isArray(m.calcs) ? m.calcs : []); break;
       case "visuals": Eddie.visuals(Array.isArray(m.items) ? m.items : []); break;
       case "projects": renderHubs(Array.isArray(m.items) ? m.items : []); break;
+      case "note_proposal": showNoteProposal(m); break;
       case "decks": baseName = typeof m.base === "string" ? m.base : null; renderDecks(Array.isArray(m.items) ? m.items : []); break;
       case "mute": setMuted(!!m.muted); break;
       case "deck_open": openDeckPath(String(m.path || "")); break;
@@ -1972,6 +1990,20 @@ chatForm.addEventListener("submit", e => {
   // Står et prosjekt åpent, gjelder spørsmålet det prosjektet.
   if (text && ask(text, currentView === "project" ? hubOpen : null)) chatInput.value = "";
 });
+/* Notatforslag fra Eddie: svaret går som en vanlig replikk, så det er Eddie (koden) som lagrer på ja */
+function showNoteProposal(m) {
+  const box = document.getElementById("note-proposal");
+  box.hidden = !m.prosjekt;
+  if (!m.prosjekt) return;
+  document.getElementById("np-project").textContent = m.prosjekt;
+  document.getElementById("np-title").textContent = m.tittel || "";
+  document.getElementById("np-text").textContent = m.tekst || "";
+}
+function answerNote(text) {
+  if (sendCommand({ action: "message", text })) document.getElementById("note-proposal").hidden = true;
+}
+document.getElementById("np-yes").addEventListener("click", () => answerNote("Ja, lagre det."));
+document.getElementById("np-no").addEventListener("click", () => answerNote("Nei, ikke lagre det."));
 setConnection(false);
 connect();
 
