@@ -343,6 +343,7 @@
   .vis-table th:first-child, .vis-table td:first-child { text-align: left; }
   .vis-table th { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--green); font-weight: 600; }
   .vis-table td { font-variant-numeric: tabular-nums; }
+  .vis-table td.txt { text-align: left; white-space: normal; min-width: 12ch; }
   .vis-table td.neg { color: var(--red); }
 
   .vis-no {
@@ -996,8 +997,8 @@ function tableEl(spec) {
     row.insertCell().textContent = c;
     for (const s of spec.serier) {
       const cell = row.insertCell(), v = s.verdier[i];
-      cell.textContent = v == null ? "–" : numFmt.format(v);
-      if (v < 0) cell.className = "neg";
+      cell.textContent = v == null ? "–" : typeof v === "string" ? v : numFmt.format(v);  // tabeller kan ha tekst
+      if (typeof v === "string") cell.className = "txt"; else if (v < 0) cell.className = "neg";
     }
   });
   return table;
