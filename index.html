@@ -1290,22 +1290,6 @@ function project(p) {
   return [CX + x1 * f * SCALE, CY + y2 * f * SCALE, (z2 + 1) / 2, f];
 }
 
-function drawFloor(sc) {
-  // Perspektivgulv under hjernen, som et rutenett som forsvinner i horisonten.
-  const horizon = CY + B.R * 0.95, bottom = H;
-  if (bottom - horizon < 20) return;
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 9; i++) {
-    const t = (i + ((S.t * 0.15) % 1)) / 9, y = horizon + Math.pow(t, 2) * (bottom - horizon);
-    ctx.strokeStyle = rgba(sc, 0.05 + 0.1 * t);
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  }
-  for (let i = -12; i <= 12; i++) {
-    ctx.strokeStyle = rgba(sc, 0.07);
-    ctx.beginPath(); ctx.moveTo(CX + i * 18, horizon); ctx.lineTo(CX + i * 140, bottom); ctx.stroke();
-  }
-}
-
 let hover = null;
 
 function draw(dt, elapsed = dt) {
@@ -1334,7 +1318,6 @@ function draw(dt, elapsed = dt) {
 
   ctx.clearRect(0, 0, W, H);
   const sc = S.color;
-  drawFloor(sc);
 
   // Glød i midten av skyen.
   const halo = ctx.createRadialGradient(CX, CY, 0, CX, CY, B.R * 1.25);
